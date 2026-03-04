@@ -398,7 +398,7 @@ canvas{max-height:250px !important}
     <textarea id="fbConfigInput" class="ifield" rows="7" style="font-family:var(--fm);font-size:11px" placeholder='{&#10;  "apiKey": "AIza...",&#10;  "authDomain": "your-app.firebaseapp.com",&#10;  "projectId": "your-project-id",&#10;  "storageBucket": "your-app.appspot.com",&#10;  "messagingSenderId": "123456789",&#10;  "appId": "1:123:web:abc"&#10;}'></textarea>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
       <button class="btn btn-a" onclick="saveFBConfig()" style="flex:1">Connect Firebase</button>
-      <button class="btn btn-b" onclick="fbLoad().then(function(ok){ if(ok){ renderAll(); if(contributions.length) renderContribs(); if(transactions.length) renderTxns(); } })" style="flex:1">Pull from Cloud</button>
+      <button class="btn btn-b" onclick="fbLoad().then(function(ok){ if(ok){ renderAll(); setTimeout(function(){ if(contributions.length) renderContribs(); if(transactions.length) renderTxns(); fetchPrices(); }, 200); } })" style="flex:1">Pull from Cloud</button>
       <button class="btn btn-b" onclick="fbSave().then(function(){ showToast('☁️ Pushed to cloud!'); })" style="flex:1">Push to Cloud</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px">
@@ -554,21 +554,34 @@ async function fbSave() {
 
 // Load all data from Firestore (overwrites localStorage)
 async function fbLoad() {
-  if (!firebaseDB) return false;
+  if (!firebaseDB) {
+    showToast('❌ Firebase not connected', true);
+    return false;
+  }
+  var status = document.getElementById('fbStatus');
+  if (status) { status.textContent = '⏳ Pulling from cloud...'; status.style.color = 'var(--muted)'; }
+  showToast('⏳ Pulling from cloud...');
   try {
     var doc = await firebaseDB.collection('vestiq').doc(firebaseUID).get();
-    if (!doc.exists) { console.log('No Firebase data yet'); return false; }
+    if (!doc.exists) {
+      if (status) { status.textContent = '⚠️ No cloud data found yet.'; status.style.color = 'var(--muted)'; }
+      showToast('⚠️ No cloud data found yet');
+      return false;
+    }
     var d = doc.data();
-    if (d.holdings)      { holdings      = JSON.parse(d.holdings);      saveData(); }
-    if (d.contributions) { contributions = JSON.parse(d.contributions); saveContribs(); }
-    if (d.transactions)  { transactions  = JSON.parse(d.transactions);  saveTxns(); }
+    if (d.holdings)      { try { holdings      = JSON.parse(d.holdings); }      catch(e){} saveData(); }
+    if (d.contributions) { try { contributions = JSON.parse(d.contributions); } catch(e){} saveContribs(); }
+    if (d.transactions)  { try { transactions  = JSON.parse(d.transactions); }  catch(e){} saveTxns(); }
     if (d.sortKey) sortKey = d.sortKey;
     if (d.sortDir) sortDir = d.sortDir;
-    console.log('Firebase loaded');
-    showToast('☁️ Data synced from cloud!');
+    if (status) { status.textContent = '✅ Pulled ' + holdings.length + ' holdings, ' + contributions.length + ' contributions, ' + transactions.length + ' transactions.'; status.style.color = 'var(--green)'; }
+    showToast('✅ Cloud data loaded!');
+    console.log('Firebase loaded:', holdings.length, 'holdings');
     return true;
   } catch(e) {
     console.error('Firebase load failed:', e);
+    if (status) { status.textContent = '❌ Pull failed: ' + e.message; status.style.color = 'var(--red)'; }
+    showToast('❌ Pull failed: ' + e.message, true);
     return false;
   }
 }
