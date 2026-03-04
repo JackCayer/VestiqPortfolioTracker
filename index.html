@@ -473,8 +473,7 @@ var hideAmounts = false;
 var anthropicKey = localStorage.getItem('vq_apikey') || '';
 var firebaseConfig = null;
 var firebaseDB     = null;
-var firebaseUID    = localStorage.getItem('vq_fbuid') || ('user_' + Math.random().toString(36).substr(2,9));
-localStorage.setItem('vq_fbuid', firebaseUID);
+var firebaseUID    = 'main'; // fixed doc ID - same on all devices
 var fbSyncing      = false;
 
 function loadFirebaseConfig() {
