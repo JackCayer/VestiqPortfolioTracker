@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>VESTIQ — Investment Tracker</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
 <style>
@@ -115,6 +117,9 @@ canvas{max-height:250px !important}
   <div style="display:flex;align-items:center;gap:12px">
     <span id="fxRate" style="font-size:11px;color:var(--accent2);font-family:var(--fm);background:rgba(74,240,200,.07);border:1px solid rgba(74,240,200,.15);border-radius:6px;padding:3px 9px"></span>
     <span id="lastUpdated" style="font-size:11px;color:var(--muted);font-family:var(--fm)"></span>
+    <button id="fbIndicator" onclick="showFBModal()" title="Set up Firebase sync" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1">☁️</button>
+    <button onclick="exportBackup()" title="Export all data as backup" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">💾</button>
+    <label title="Import backup file" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1;display:inline-flex;align-items:center" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">📂<input type="file" accept=".json" onchange="importBackup(event)" style="display:none"/></label>
     <button onclick="showKeyModal()" title="API Key Settings" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">⚙️</button>
     <button id="eyeBtn" onclick="toggleHide()" title="Hide dollar amounts" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor=hideAmounts?'var(--accent)':'var(--border)';this.style.color=hideAmounts?'var(--accent)':'var(--muted)'">👁</button>
     <div class="live-pill"><div class="dot"></div>LIVE</div>
@@ -376,6 +381,34 @@ canvas{max-height:250px !important}
 
 </main>
 
+<!-- Firebase Modal -->
+<div id="fbModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:540px;width:90%;position:relative">
+    <div style="font-size:16px;font-weight:700;color:var(--accent2);margin-bottom:8px">☁️ Firebase Sync Setup</div>
+    <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.8;margin-bottom:16px">
+      Syncs your data across all devices in real time — free forever for personal use.<br>
+      <strong style="color:var(--accent)">Setup (5 min):</strong><br>
+      1. Go to <strong>console.firebase.google.com</strong> → Create project (disable Analytics)<br>
+      2. Click <strong>Firestore Database</strong> → Create database → Start in <strong>test mode</strong><br>
+      3. Go to <strong>Project Settings ⚙️</strong> → scroll to "Your apps" → click <strong>&lt;/&gt;</strong> (Web)<br>
+      4. Register app → copy the <strong>firebaseConfig</strong> object → paste below<br>
+      5. Also go to <strong>Firestore → Rules</strong> and make sure rules allow read/write
+    </p>
+    <div class="flbl" style="margin-bottom:6px">Firebase Config (paste the entire config object)</div>
+    <textarea id="fbConfigInput" class="ifield" rows="7" style="font-family:var(--fm);font-size:11px" placeholder='{&#10;  "apiKey": "AIza...",&#10;  "authDomain": "your-app.firebaseapp.com",&#10;  "projectId": "your-project-id",&#10;  "storageBucket": "your-app.appspot.com",&#10;  "messagingSenderId": "123456789",&#10;  "appId": "1:123:web:abc"&#10;}'></textarea>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+      <button class="btn btn-a" onclick="saveFBConfig()" style="flex:1">Connect Firebase</button>
+      <button class="btn btn-b" onclick="fbLoad().then(function(ok){ if(ok){ renderAll(); if(contributions.length) renderContribs(); if(transactions.length) renderTxns(); } })" style="flex:1">Pull from Cloud</button>
+      <button class="btn btn-b" onclick="fbSave().then(function(){ showToast('☁️ Pushed to cloud!'); })" style="flex:1">Push to Cloud</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:10px">
+      <button class="btn" style="flex:1;background:rgba(255,94,94,.1);border-color:rgba(255,94,94,.3);color:var(--red)" onclick="disconnectFB()">Disconnect</button>
+      <button class="btn btn-b" onclick="closeFBModal()" style="flex:1">Close</button>
+    </div>
+    <div id="fbStatus" style="margin-top:12px;font-size:12px;font-family:var(--fm)"></div>
+  </div>
+</div>
+
 <!-- API Key Modal -->
 <div id="keyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:480px;width:90%;position:relative">
@@ -418,6 +451,7 @@ function loadData() {
 
 function saveData() {
   localStorage.setItem('vq_holdings', JSON.stringify(holdings));
+  if (firebaseDB) fbSave();
 }
 
 // ── TAB SWITCHING ─────────────────────────────────────────────────────────
@@ -446,6 +480,98 @@ var sortKey = 'mktValue';
 var sortDir = -1; // -1 = descending, 1 = ascending
 var hideAmounts = false;
 var anthropicKey = localStorage.getItem('vq_apikey') || '';
+var firebaseConfig = null;
+var firebaseDB     = null;
+var firebaseUID    = localStorage.getItem('vq_fbuid') || ('user_' + Math.random().toString(36).substr(2,9));
+localStorage.setItem('vq_fbuid', firebaseUID);
+var fbSyncing      = false;
+
+function loadFirebaseConfig() {
+  try {
+    var raw = localStorage.getItem('vq_fbconfig');
+    if (raw) firebaseConfig = JSON.parse(raw);
+  } catch(e) { firebaseConfig = null; }
+}
+
+function initFirebase() {
+  if (!firebaseConfig) return false;
+  try {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    firebaseDB = firebase.firestore();
+    console.log('Firebase connected');
+    updateFBIndicator(true);
+    return true;
+  } catch(e) {
+    console.error('Firebase init failed:', e);
+    updateFBIndicator(false);
+    return false;
+  }
+}
+
+function updateFBIndicator(connected) {
+  var el = document.getElementById('fbIndicator');
+  if (!el) return;
+  if (!firebaseConfig) {
+    el.textContent = '☁️';
+    el.title = 'Set up Firebase sync';
+    el.style.color = 'var(--muted)';
+    el.style.borderColor = 'var(--border)';
+  } else if (connected) {
+    el.textContent = '🟢';
+    el.title = 'Firebase synced';
+    el.style.color = 'var(--accent2)';
+    el.style.borderColor = 'rgba(74,240,200,.3)';
+  } else {
+    el.textContent = '🔴';
+    el.title = 'Firebase error';
+    el.style.color = 'var(--red)';
+    el.style.borderColor = 'rgba(255,94,94,.3)';
+  }
+}
+
+// Save all data to Firestore
+async function fbSave() {
+  if (!firebaseDB) return;
+  fbSyncing = true;
+  try {
+    await firebaseDB.collection('vestiq').doc(firebaseUID).set({
+      holdings:      JSON.stringify(holdings),
+      contributions: JSON.stringify(contributions),
+      transactions:  JSON.stringify(transactions),
+      sortKey:       sortKey,
+      sortDir:       sortDir,
+      updatedAt:     new Date().toISOString()
+    });
+    console.log('Firebase saved');
+  } catch(e) {
+    console.error('Firebase save failed:', e);
+    showToast('⚠️ Firebase sync failed', true);
+  }
+  fbSyncing = false;
+}
+
+// Load all data from Firestore (overwrites localStorage)
+async function fbLoad() {
+  if (!firebaseDB) return false;
+  try {
+    var doc = await firebaseDB.collection('vestiq').doc(firebaseUID).get();
+    if (!doc.exists) { console.log('No Firebase data yet'); return false; }
+    var d = doc.data();
+    if (d.holdings)      { holdings      = JSON.parse(d.holdings);      saveData(); }
+    if (d.contributions) { contributions = JSON.parse(d.contributions); saveContribs(); }
+    if (d.transactions)  { transactions  = JSON.parse(d.transactions);  saveTxns(); }
+    if (d.sortKey) sortKey = d.sortKey;
+    if (d.sortDir) sortDir = d.sortDir;
+    console.log('Firebase loaded');
+    showToast('☁️ Data synced from cloud!');
+    return true;
+  } catch(e) {
+    console.error('Firebase load failed:', e);
+    return false;
+  }
+}
 var contributions = [];
 var transactions  = [];   // full transaction log
 var txFilter      = 'all';
@@ -456,6 +582,7 @@ function loadTxns() {
 
 function saveTxns() {
   localStorage.setItem('vq_txns', JSON.stringify(transactions));
+  if (firebaseDB) fbSave();
 }
 
 function loadContribs() {
@@ -464,6 +591,7 @@ function loadContribs() {
 
 function saveContribs() {
   localStorage.setItem('vq_contribs', JSON.stringify(contributions));
+  if (firebaseDB) fbSave();
 }
 
 var TSX_TICKERS = ['XGD','RY','TD','FTS','SVR','BCE','ENB','PRG','XIU','XIC','XEI','ZEB','ZWB','ZDV','CPX','SU','CNQ','BMO','BNS','CM','NA','MFC','SLF','FFH','ATD','CNR','CP','WN','L','MRU','EMP','DOL','CCL','CTC','THI','TRP','PPL','IPL','AQN','BIP','BAM','GWO','POW','IGM','IFC'];
@@ -547,6 +675,127 @@ function enrich() {
       color: COLORS[i % COLORS.length]
     });
   });
+}
+
+// ── FIREBASE SYNC ────────────────────────────────────────────────────────
+function showFBModal() {
+  var modal = document.getElementById('fbModal');
+  modal.style.display = 'flex';
+  if (firebaseConfig) {
+    document.getElementById('fbConfigInput').value = JSON.stringify(firebaseConfig, null, 2);
+    document.getElementById('fbStatus').textContent = '✅ Firebase connected';
+    document.getElementById('fbStatus').style.color = 'var(--green)';
+  }
+}
+
+function closeFBModal() {
+  document.getElementById('fbModal').style.display = 'none';
+}
+
+function saveFBConfig() {
+  var raw = document.getElementById('fbConfigInput').value.trim();
+  var status = document.getElementById('fbStatus');
+  try {
+    // Strip "const firebaseConfig = " prefix if user pasted full code
+    raw = raw.replace(/^.*?=\s*/, '').replace(/;?\s*$/, '');
+    var config = JSON.parse(raw);
+    if (!config.apiKey || !config.projectId) throw new Error('Missing apiKey or projectId');
+    firebaseConfig = config;
+    localStorage.setItem('vq_fbconfig', JSON.stringify(config));
+    var ok = initFirebase();
+    if (ok) {
+      status.textContent = '✅ Connected! Pulling data from cloud...';
+      status.style.color = 'var(--green)';
+      fbLoad().then(function(loaded) {
+        if (loaded) {
+          renderAll();
+          if (contributions.length) renderContribs();
+          if (transactions.length) renderTxns();
+          status.textContent = '✅ Connected and synced!';
+        } else {
+          status.textContent = '✅ Connected! No cloud data yet — your local data will sync on next save.';
+          fbSave();
+        }
+      });
+    } else {
+      status.textContent = '❌ Connection failed — check your config';
+      status.style.color = 'var(--red)';
+    }
+  } catch(e) {
+    status.textContent = '❌ Invalid config: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+}
+
+function disconnectFB() {
+  if (!confirm('Disconnect Firebase? Your local data will remain but cloud sync will stop.')) return;
+  firebaseConfig = null;
+  firebaseDB = null;
+  localStorage.removeItem('vq_fbconfig');
+  updateFBIndicator(false);
+  document.getElementById('fbStatus').textContent = 'Disconnected.';
+  document.getElementById('fbStatus').style.color = 'var(--muted)';
+  document.getElementById('fbConfigInput').value = '';
+}
+
+// ── BACKUP EXPORT / IMPORT ───────────────────────────────────────────────
+function exportBackup() {
+  var backup = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    holdings: holdings,
+    contributions: contributions,
+    transactions: transactions,
+    sortKey: sortKey,
+    sortDir: sortDir
+  };
+  var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url;
+  a.download = 'vestiq-backup-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importBackup(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var backup = JSON.parse(e.target.result);
+      if (!backup.version || !backup.holdings) throw new Error('Invalid backup file');
+      if (!confirm('This will replace all your current data with the backup from ' + (backup.exportedAt ? backup.exportedAt.split('T')[0] : 'unknown date') + '. Continue?')) return;
+      holdings      = backup.holdings      || [];
+      contributions = backup.contributions || [];
+      transactions  = backup.transactions  || [];
+      sortKey       = backup.sortKey       || 'mktValue';
+      sortDir       = backup.sortDir       || -1;
+      saveData();
+      saveContribs();
+      saveTxns();
+      renderAll();
+      if (contributions.length) renderContribs();
+      if (transactions.length)  renderTxns();
+      // Flash a success toast
+      showToast('✅ Backup restored successfully!');
+    } catch(err) {
+      showToast('❌ Invalid backup file — ' + err.message, true);
+    }
+  };
+  reader.readAsText(file);
+  // Reset input so same file can be re-imported
+  event.target.value = '';
+}
+
+function showToast(msg, isError) {
+  var t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:' + (isError ? 'var(--red)' : 'var(--accent)') +
+    ';color:#000;font-family:var(--fm);font-size:13px;font-weight:600;padding:12px 20px;border-radius:10px;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,.4);transition:opacity .4s';
+  document.body.appendChild(t);
+  setTimeout(function(){ t.style.opacity='0'; setTimeout(function(){ t.remove(); }, 400); }, 3000);
 }
 
 // ── API KEY MODAL ────────────────────────────────────────────────────────
@@ -1464,6 +1713,20 @@ function drawContribChart(currentValue, totalContrib) {
 loadData();
 loadContribs();
 loadTxns();
+loadFirebaseConfig();
+// Init Firebase and pull cloud data if connected
+if (firebaseConfig) {
+  var fbOk = initFirebase();
+  if (fbOk) {
+    fbLoad().then(function(loaded) {
+      if (loaded) {
+        renderAll();
+        if (contributions.length) renderContribs();
+        if (transactions.length)  renderTxns();
+      }
+    });
+  }
+}
 fetchPrices();
 setInterval(fetchPrices, 15000);
 </script>
