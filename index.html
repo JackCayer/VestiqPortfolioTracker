@@ -1676,13 +1676,14 @@ function rebuildHoldingsFromTxns() {
     var totalCost    = tickerLots.reduce(function(s,l){ return s + l.totalCost; }, 0);
     var avgCost      = totalShares > 0 ? totalCost / totalShares : 0;
     var existing    = existingMap[ticker] || {};
+    // avgCost from transactions is ALWAYS CAD — costUSD must be false
     return {
-      id:      existing.id      || (Date.now() + Math.random()),
+      id:      existing.id  || (Date.now() + Math.random()),
       ticker:  ticker,
       shares:  Math.round(totalShares * 10000) / 10000,
       avgCost: Math.round(avgCost * 100) / 100,
-      costUSD: existing.costUSD || false,
-      notes:   existing.notes   || ''
+      costUSD: false,  // transaction amounts are always stored in CAD
+      notes:   existing.notes || ''
     };
   }).filter(function(h){ return h.shares > 0.0001; });
 
@@ -1690,6 +1691,7 @@ function rebuildHoldingsFromTxns() {
   newHoldings.sort(function(a,b){ return a.ticker.localeCompare(b.ticker); });
   holdings = newHoldings;
   localStorage.setItem('vq_holdings', JSON.stringify(holdings));
+  console.log('[REBUILD] Holdings rebuilt from transactions:', newHoldings.map(function(h){ return h.ticker + ' avgCost=$' + h.avgCost + ' CAD shares=' + h.shares; }));
   if (firebaseDB) fbSave();
   return holdings;
 }
