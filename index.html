@@ -308,7 +308,7 @@ canvas{max-height:250px !important}
       <div id="txnSummary" style="font-family:var(--fm);font-size:13px;color:var(--muted);line-height:2">
         No transactions imported yet.
       </div>
-      <button class="btn btn-a" onclick="rebuildHoldingsFromTxns();renderAll();renderContribs();showToast('✅ Holdings rebuilt from transactions!');" style="margin-top:10px;width:100%">🔄 Rebuild Holdings from Transactions</button>
+      <button class="btn btn-a" onclick="doRebuild()" style="margin-top:10px;width:100%">🔄 Rebuild Holdings from Transactions</button>
       <button class="btn btn-b" onclick="clearTxns()" style="margin-top:10px;width:100%">Clear All Transactions</button>
     </div>
   </div>
@@ -1437,8 +1437,11 @@ function importTxnCSV() {
 }
 
 function clearTxns() {
-  if (!confirm('Clear all transactions?')) return;
-  transactions = []; saveTxns(); renderTxns();
+  if (!confirm('Clear all ' + transactions.length + ' transactions? This cannot be undone.')) return;
+  transactions = [];
+  saveTxns();
+  renderTxns();
+  showToast('✅ All transactions cleared');
 }
 
 function setTxFilter(f) {
@@ -1614,6 +1617,18 @@ function renderTxns() {
 
 // ── REBUILD HOLDINGS FROM TRANSACTIONS ───────────────────────────────────
 // Replays all BUY/SELL transactions to compute exact holdings with weighted avg cost
+function doRebuild() {
+  if (!transactions.length) { showToast('⚠️ No transactions to rebuild from', true); return; }
+  rebuildHoldingsFromTxns();
+  showToast('⏳ Rebuilding — fetching prices...');
+  fetchPrices().then(function() {
+    renderAll();
+    renderContribs();
+    renderDividends();
+    showToast('✅ Holdings rebuilt — ' + holdings.length + ' positions');
+  });
+}
+
 function rebuildHoldingsFromTxns() {
   if (!transactions.length) return;
 
