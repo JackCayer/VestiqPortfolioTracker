@@ -398,7 +398,7 @@ canvas{max-height:250px !important}
     <textarea id="fbConfigInput" class="ifield" rows="7" style="font-family:var(--fm);font-size:11px" placeholder='{&#10;  "apiKey": "AIza...",&#10;  "authDomain": "your-app.firebaseapp.com",&#10;  "projectId": "your-project-id",&#10;  "storageBucket": "your-app.appspot.com",&#10;  "messagingSenderId": "123456789",&#10;  "appId": "1:123:web:abc"&#10;}'></textarea>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
       <button class="btn btn-a" onclick="saveFBConfig()" style="flex:1">Connect Firebase</button>
-      <button class="btn btn-b" onclick="fbLoad().then(function(ok){ if(ok){ renderAll(); setTimeout(function(){ if(contributions.length) renderContribs(); if(transactions.length) renderTxns(); fetchPrices(); }, 200); } })" style="flex:1">Pull from Cloud</button>
+      <button class="btn btn-b" onclick="fbLoad().then(function(ok){ if(ok){ closeFBModal(); setTimeout(function(){ renderAll(); fetchPrices(); if(contributions.length) renderContribs(); if(transactions.length) renderTxns(); }, 300); } })" style="flex:1">Pull from Cloud</button>
       <button class="btn btn-b" onclick="fbSave().then(function(){ showToast('☁️ Pushed to cloud!'); })" style="flex:1">Push to Cloud</button>
     </div>
     <div style="display:flex;gap:10px;margin-top:10px">
@@ -569,14 +569,16 @@ async function fbLoad() {
       return false;
     }
     var d = doc.data();
-    if (d.holdings)      { try { holdings      = JSON.parse(d.holdings); }      catch(e){} saveData(); }
-    if (d.contributions) { try { contributions = JSON.parse(d.contributions); } catch(e){} saveContribs(); }
-    if (d.transactions)  { try { transactions  = JSON.parse(d.transactions); }  catch(e){} saveTxns(); }
+    // Write directly to localStorage without triggering fbSave loop
+    if (d.holdings)      { try { holdings      = JSON.parse(d.holdings);      localStorage.setItem('vq_holdings', d.holdings); }      catch(e){ console.error('holdings parse',e); } }
+    if (d.contributions) { try { contributions = JSON.parse(d.contributions); localStorage.setItem('vq_contribs',  d.contributions); } catch(e){ console.error('contrib parse',e); } }
+    if (d.transactions)  { try { transactions  = JSON.parse(d.transactions);  localStorage.setItem('vq_txns',     d.transactions); }  catch(e){ console.error('txn parse',e); } }
     if (d.sortKey) sortKey = d.sortKey;
     if (d.sortDir) sortDir = d.sortDir;
-    if (status) { status.textContent = '✅ Pulled ' + holdings.length + ' holdings, ' + contributions.length + ' contributions, ' + transactions.length + ' transactions.'; status.style.color = 'var(--green)'; }
-    showToast('✅ Cloud data loaded!');
-    console.log('Firebase loaded:', holdings.length, 'holdings');
+    var summary = holdings.length + ' holdings, ' + contributions.length + ' contributions, ' + transactions.length + ' transactions';
+    if (status) { status.textContent = '✅ Pulled ' + summary; status.style.color = 'var(--green)'; }
+    showToast('✅ Loaded: ' + summary);
+    console.log('Firebase loaded:', summary);
     return true;
   } catch(e) {
     console.error('Firebase load failed:', e);
