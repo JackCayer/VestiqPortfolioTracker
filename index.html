@@ -756,7 +756,7 @@ function enrich() {
     var gainPct   = costBasis ? (gain / costBasis) * 100 : 0;
     var dayChange = h.shares * (p.change || 0);
     return Object.assign({}, h, p, {
-      mktValue: mktValue, costBasis: costBasis, avgCostCAD: avgCostCAD,
+      mktValue: mktValue, costBasis: costBasis, avgCostCAD: avgCostCAD, currency: p.currency || 'CAD',
       gain: gain, gainPct: gainPct, dayChange: dayChange,
       color: COLORS[i % COLORS.length]
     });
@@ -1000,8 +1000,8 @@ function renderAll() {
         return '<tr>' +
           '<td><span class="badge">' + h.ticker + '</span></td>' +
           '<td>' + (hideAmounts ? '••••' : h.shares) + '</td>' +
-          '<td>' + (hideAmounts ? '••••••' : '$' + avgCostCAD.toFixed(2) + ' <span style="font-size:9px;font-family:var(--fm);color:var(--muted);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">CAD</span>') + '</td>' +
-          '<td><strong>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—')) + '</strong> <span style="font-size:9px;color:var(--muted)">' + (h.currency || '') + '</span></td>' +
+          '<td>' + (hideAmounts ? '••••••' : '$' + h.avgCostCAD.toFixed(2) + ' <span style="font-size:9px;font-family:var(--fm);color:var(--muted);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">CAD</span>') + '</td>' +
+          '<td><strong>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—')) + '</strong> <span style="font-size:9px;color:' + (h.currency === 'USD→CAD' ? 'var(--accent2)' : 'var(--muted)') + ';background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">' + (h.currency || 'CAD') + '</span></td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain)) + '</td>' +
           '<td>' + cpd(h.gainPct) + '</td>' +
@@ -1020,7 +1020,7 @@ function renderAll() {
             (hideAmounts ? '<span style="font-family:var(--fm);font-size:13px">••••••</span>' : '<input class="ifield" style="width:100px;padding:6px 8px" type="number" value="' + h.avgCost + '" onchange="upd(' + h.id + ',\'avgCost\',+this.value)"/>') +
             '<div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--fm)">CAD</div>' +
           '</td>' +
-          '<td>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—') + ' <span style="font-size:9px;font-family:var(--fm);color:' + (p.currency === 'USD→CAD' ? 'var(--accent2)' : 'var(--muted)') + ';background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">' + (p.currency || 'CAD') + '</span>') + '</td>' +
+          '<td>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—') + ' <span style="font-size:9px;font-family:var(--fm);color:' + (h.currency === 'USD→CAD' ? 'var(--accent2)' : 'var(--muted)') + ';background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">' + (h.currency || 'CAD') + '</span>') + '</td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain)) + '</td>' +
           '<td>' + cpd(h.gainPct) + '</td>' +
