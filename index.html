@@ -990,7 +990,7 @@ async function sendAI() {
 function addContrib() {
   var date = document.getElementById('cin-date').value;
   var amt  = parseFloat(document.getElementById('cin-amt').value);
-  if (!date || isNaN(amt) || amt <= 0) { alert('Please enter a valid date and amount.'); return; }
+  if (!date || isNaN(amt) || amt === 0) { alert('Please enter a valid date and amount.'); return; }
   contributions.push({ id: Date.now(), date: date, amount: amt });
   contributions.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
   saveContribs();
@@ -1020,7 +1020,7 @@ function parseContribCSVText(text) {
     if (isNaN(dateObj.getTime())) continue;
     var dateStr = dateObj.toISOString().split('T')[0];
     var amount  = parseFloat(parts[1].replace(/[$, ]/g,''));
-    if (isNaN(amount) || amount <= 0) continue;
+    if (isNaN(amount) || amount === 0) continue;
     parsed.push({ id: Date.now() + Math.random(), date: dateStr, amount: amount });
   }
   parsed.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
