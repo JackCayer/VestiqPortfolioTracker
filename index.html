@@ -306,7 +306,8 @@ canvas{max-height:250px !important}
       <div id="txnSummary" style="font-family:var(--fm);font-size:13px;color:var(--muted);line-height:2">
         No transactions imported yet.
       </div>
-      <button class="btn btn-b" onclick="clearTxns()" style="margin-top:16px;width:100%">Clear All Transactions</button>
+      <button class="btn btn-a" onclick="rebuildHoldingsFromTxns();renderAll();renderContribs();showToast('✅ Holdings rebuilt from transactions!');" style="margin-top:10px;width:100%">🔄 Rebuild Holdings from Transactions</button>
+      <button class="btn btn-b" onclick="clearTxns()" style="margin-top:10px;width:100%">Clear All Transactions</button>
     </div>
   </div>
 
@@ -1403,7 +1404,10 @@ function parseTxnCSVText(text) {
     var price   = parseFloat((parts[4]||'').replace(/[$, ]/g,'')) || 0;
     var amount  = parseFloat((parts[5]||'').replace(/[$, ]/g,'')) || 0;
     var notes   = (parts[6] || '').trim();
-    parsed.push({ id: Date.now()+Math.random(), date: date, type: type, ticker: ticker, shares: shares, price: price, amount: amount, notes: notes });
+    // Extract FX rate from notes field e.g. "FX 1.4153" or "FX Rate: 1.4153"
+    var fxMatch = notes.match(/FX\s*(?:Rate[:\s]*)?([\d.]+)/i);
+    var fxRate  = fxMatch ? parseFloat(fxMatch[1]) : 0;
+    parsed.push({ id: Date.now()+Math.random(), date: date, type: type, ticker: ticker, shares: shares, price: price, amount: amount, notes: notes, fxRate: fxRate });
   }
   parsed.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
   return parsed;
@@ -1416,10 +1420,11 @@ function importTxnCSV() {
   if (parsed.length > 0) {
     transactions = parsed;
     saveTxns();
-    el.textContent = '✅ Imported ' + parsed.length + ' transactions!';
+    rebuildHoldingsFromTxns();
+    el.textContent = '✅ Imported ' + parsed.length + ' transactions — holdings rebuilt!';
     el.style.color = 'var(--green)';
+    renderAll();
     renderTxns();
-    // Update contrib chart with accurate historical data
     if (contributions.length) renderContribs();
   } else {
     el.textContent = '⚠️ No valid rows found. Check format.';
@@ -1518,18 +1523,21 @@ function renderLotBreakdown() {
     html += '<div style="font-weight:700;color:var(--accent);font-family:var(--fm);margin-bottom:8px;font-size:13px">' +
       ticker + ' <span style="color:var(--muted);font-weight:400">— ' + currentShares.toFixed(4) + ' shares held | Current: $' + currentPrice.toFixed(2) + ' CAD</span></div>';
     html += '<table class="tbl" style="margin-bottom:0"><thead><tr>' +
-      '<th>Date</th><th>Shares</th><th>Price Paid (CAD)</th><th>Cost</th><th>Current Value</th><th>Gain $</th><th>Gain %</th>' +
+      '<th>Date</th><th>Shares</th><th>Price (CAD)</th><th>FX Rate</th><th>Cost (CAD)</th><th>Current Value</th><th>Gain $</th><th>Gain %</th>' +
       '</tr></thead><tbody>';
 
     tickerLots.forEach(function(lot) {
+      var lotCost  = lot.totalCost || lot.amount || 0;
       var lotValue = lot.shares * currentPrice;
-      var gain     = lotValue - lot.amount;
-      var gainPct  = lot.amount ? (gain / lot.amount) * 100 : 0;
+      var gain     = lotValue - lotCost;
+      var gainPct  = lotCost ? (gain / lotCost) * 100 : 0;
+      var priceCad = lot.costPerShare || (lot.shares > 0 ? lotCost / lot.shares : 0);
       html += '<tr>' +
-        '<td>' + lot.date + '</td>' +
+        '<td>' + (lot.date||'—') + '</td>' +
         '<td>' + lot.shares.toFixed(4) + '</td>' +
-        '<td>$' + (lot.priceCad ? lot.priceCad.toFixed(2) : (lot.amount/lot.shares).toFixed(2)) + '</td>' +
-        '<td>' + (hideAmounts ? '••••••' : '$' + lot.amount.toFixed(2)) + '</td>' +
+        '<td>$' + priceCad.toFixed(4) + '</td>' +
+        '<td>' + (lot.fxRate ? '<span style="font-size:11px;color:var(--accent2)">' + lot.fxRate.toFixed(4) + '</span>' : '<span style="color:var(--muted);font-size:11px">CAD</span>') + '</td>' +
+        '<td>' + (hideAmounts ? '••••••' : '$' + lotCost.toFixed(2)) + '</td>' +
         '<td>' + (hideAmounts ? '••••••' : '$' + lotValue.toFixed(2)) + '</td>' +
         '<td>' + (hideAmounts ? cpd(gainPct) : cd(gain)) + '</td>' +
         '<td>' + cpd(gainPct) + '</td>' +
@@ -1582,6 +1590,103 @@ function renderTxns() {
   renderLotBreakdown();
 }
 
+// ── REBUILD HOLDINGS FROM TRANSACTIONS ───────────────────────────────────
+// Replays all BUY/SELL transactions to compute exact holdings with weighted avg cost
+function rebuildHoldingsFromTxns() {
+  if (!transactions.length) return;
+
+  // Track lots per ticker: { TICKER: [ {shares, costPerShare, totalCost} ] }
+  var lots = {};
+
+  transactions.forEach(function(t) {
+    if (t.type === 'BUY' && t.ticker && t.shares > 0) {
+      if (!lots[t.ticker]) lots[t.ticker] = [];
+      // Use the transaction's own FX rate for USD price conversion
+      // Priority: 1) stored fxRate field  2) extract from notes  3) no conversion needed (already CAD)
+      var txFx = t.fxRate || 0;
+      if (!txFx && t.notes) {
+        var fxM = t.notes.match(/FX\s*(?:Rate[:\s]*)?([\d.]+)/i);
+        if (fxM) txFx = parseFloat(fxM[1]);
+      }
+      // costPerShare: if price stored in USD (fxRate > 1 means USD transaction), convert with that exact rate
+      // if price already in CAD (no fxRate), use as-is
+      // if price is 0, derive from amount/shares (amount is always CAD)
+      var costPerShare;
+      if (t.price > 0) {
+        // price field: already converted to CAD if fxRate was applied in addSingleTxn
+        // for CSV imports where price was entered as USD, convert with stored fxRate
+        costPerShare = t.price; // price is always stored as CAD in our system
+      } else if (t.shares > 0 && t.amount > 0) {
+        costPerShare = t.amount / t.shares; // derive from CAD amount
+      } else {
+        costPerShare = 0;
+      }
+      // totalCost is always the CAD amount paid
+      var totalCostCAD = t.amount > 0 ? t.amount : costPerShare * t.shares;
+      lots[t.ticker].push({ shares: t.shares, costPerShare: costPerShare, totalCost: totalCostCAD, fxRate: txFx, date: t.date });
+    } else if (t.type === 'SELL' && t.ticker && t.shares > 0) {
+      if (!lots[t.ticker]) return;
+      // FIFO: remove shares from oldest lots first
+      var toSell = t.shares;
+      lots[t.ticker] = lots[t.ticker].reduce(function(acc, lot) {
+        if (toSell <= 0) { acc.push(lot); return acc; }
+        if (lot.shares <= toSell) {
+          toSell -= lot.shares; // consume entire lot
+        } else {
+          var pct = toSell / lot.shares;
+          acc.push({ shares: lot.shares - toSell, costPerShare: lot.costPerShare, totalCost: lot.totalCost * (1 - pct) });
+          toSell = 0;
+        }
+        return acc;
+      }, []);
+      if (!lots[t.ticker].length) delete lots[t.ticker];
+    }
+  });
+
+  // Also sync contributions from CONT transactions
+  var contTxns = transactions.filter(function(t){ return t.type === 'CONT' || t.type === 'WD'; });
+  if (contTxns.length) {
+    // Merge with existing contributions — add any not already present by date+amount
+    contTxns.forEach(function(t) {
+      var amount = t.type === 'WD' ? -Math.abs(t.amount) : t.amount;
+      var alreadyExists = contributions.some(function(c){ return c.date === t.date && Math.abs(c.amount - amount) < 0.01; });
+      if (!alreadyExists) {
+        contributions.push({ id: Date.now() + Math.random(), date: t.date, amount: amount });
+      }
+    });
+    contributions.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+    localStorage.setItem('vq_contribs', JSON.stringify(contributions));
+  }
+
+  // Convert lots map to holdings array
+  // Preserve existing holding metadata (name, notes) where possible
+  var existingMap = {};
+  holdings.forEach(function(h){ existingMap[h.ticker] = h; });
+
+  var newHoldings = Object.keys(lots).map(function(ticker) {
+    var tickerLots  = lots[ticker];
+    var totalShares  = tickerLots.reduce(function(s,l){ return s + l.shares; }, 0);
+    var totalCost    = tickerLots.reduce(function(s,l){ return s + l.totalCost; }, 0);
+    var avgCost      = totalShares > 0 ? totalCost / totalShares : 0;
+    var existing    = existingMap[ticker] || {};
+    return {
+      id:      existing.id      || (Date.now() + Math.random()),
+      ticker:  ticker,
+      shares:  Math.round(totalShares * 10000) / 10000,
+      avgCost: Math.round(avgCost * 100) / 100,
+      costUSD: existing.costUSD || false,
+      notes:   existing.notes   || ''
+    };
+  }).filter(function(h){ return h.shares > 0.0001; });
+
+  // Sort alphabetically
+  newHoldings.sort(function(a,b){ return a.ticker.localeCompare(b.ticker); });
+  holdings = newHoldings;
+  localStorage.setItem('vq_holdings', JSON.stringify(holdings));
+  if (firebaseDB) fbSave();
+  return holdings;
+}
+
 // ── ADD SINGLE TRANSACTION ───────────────────────────────────────────────
 function addSingleTxn() {
   var date   = document.getElementById('txn-date').value;
@@ -1606,9 +1711,22 @@ function addSingleTxn() {
   if ((type==='BUY'||type==='SELL') && !ticker) { status.textContent = '⚠️ Ticker is required for BUY/SELL'; status.style.color='var(--red)'; return; }
   if ((type==='BUY'||type==='SELL') && shares<=0) { status.textContent = '⚠️ Shares required for BUY/SELL'; status.style.color='var(--red)'; return; }
 
-  transactions.push({ id: Date.now()+Math.random(), date: date, type: type, ticker: ticker, shares: shares, price: price, amount: amount, notes: notes });
+  var manualFx = parseFloat(document.getElementById('txn-fx').value) || 0;
+  transactions.push({ id: Date.now()+Math.random(), date: date, type: type, ticker: ticker, shares: shares, price: price, amount: amount, notes: notes, fxRate: manualFx });
   transactions.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
   saveTxns();
+
+  // Rebuild all tabs from transactions
+  if (type === 'BUY' || type === 'SELL') {
+    rebuildHoldingsFromTxns();
+    renderAll();
+  } else if (type === 'CONT' || type === 'WD') {
+    rebuildHoldingsFromTxns(); // also syncs contributions
+    if (contributions.length) renderContribs();
+  } else if (type === 'DIV' || type === 'FPLINT') {
+    renderDividends();
+  }
+  renderTxns();
 
   // Clear form
   document.getElementById('txn-shares').value = '';
@@ -1621,7 +1739,6 @@ function addSingleTxn() {
   status.textContent = '✅ Transaction added!';
   status.style.color = 'var(--green)';
   setTimeout(function(){ status.textContent = ''; }, 2000);
-  renderTxns();
 }
 
 // ── DIVIDENDS ─────────────────────────────────────────────────────────────
@@ -1648,6 +1765,7 @@ function addManualDiv() {
   status.style.color = 'var(--green)';
   setTimeout(function(){ status.textContent=''; }, 2000);
   renderDividends();
+  renderTxns();
 }
 
 function renderDividends() {
