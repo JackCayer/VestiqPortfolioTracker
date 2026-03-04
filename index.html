@@ -114,6 +114,7 @@ canvas{max-height:250px !important}
   <div style="display:flex;align-items:center;gap:12px">
     <span id="fxRate" style="font-size:11px;color:var(--accent2);font-family:var(--fm);background:rgba(74,240,200,.07);border:1px solid rgba(74,240,200,.15);border-radius:6px;padding:3px 9px"></span>
     <span id="lastUpdated" style="font-size:11px;color:var(--muted);font-family:var(--fm)"></span>
+    <button onclick="showKeyModal()" title="API Key Settings" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">⚙️</button>
     <button id="eyeBtn" onclick="toggleHide()" title="Hide dollar amounts" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor=hideAmounts?'var(--accent)':'var(--border)';this.style.color=hideAmounts?'var(--accent)':'var(--muted)'">👁</button>
     <div class="live-pill"><div class="dot"></div>LIVE</div>
   </div>
@@ -245,6 +246,9 @@ canvas{max-height:250px !important}
     <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:16px;line-height:1.7">
       Claude knows your full portfolio and searches real-time news before answering. Ask anything.
     </p>
+    <div id="noKeyWarning" style="display:none;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;font-family:var(--fm);color:#aaa">
+      ⚙️ No API key set — <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="showKeyModal()">click here to add your Anthropic API key</span> to enable the AI Advisor.
+    </div>
     <div class="chips">
       <button class="chip" onclick="useChip(this)">What's my biggest risk right now?</button>
       <button class="chip" onclick="useChip(this)">Any news affecting my holdings today?</button>
@@ -266,6 +270,24 @@ canvas{max-height:250px !important}
 </div>
 
 </main>
+
+<!-- API Key Modal -->
+<div id="keyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:480px;width:90%;position:relative">
+    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:8px">⚙️ Anthropic API Key</div>
+    <p style="font-size:13px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:20px">
+      Required for the AI Advisor. Get a free key at <strong style="color:var(--accent2)">console.anthropic.com</strong><br>
+      Your key is saved locally in your browser only — never sent anywhere except Anthropic.
+    </p>
+    <div class="flbl" style="margin-bottom:6px">API Key (starts with sk-ant-...)</div>
+    <input id="keyInput" class="ifield" type="password" placeholder="sk-ant-api03-..." style="margin-bottom:16px;font-family:var(--fm)"/>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-a" onclick="saveKey()" style="flex:1">Save Key</button>
+      <button class="btn btn-b" onclick="closeKeyModal()" style="flex:1">Cancel</button>
+    </div>
+    <div id="keyStatus" style="margin-top:12px;font-size:12px;font-family:var(--fm)"></div>
+  </div>
+</div>
 
 <script>
 // ── STATE ─────────────────────────────────────────────────────────────────
@@ -304,6 +326,10 @@ function showTab(name) {
   if (p) p.classList.add('on');
   if (t) t.classList.add('on');
   if (name === 'charts') setTimeout(function(){ drawCharts(enrich()); }, 80);
+  if (name === 'ai') {
+    var w = document.getElementById('noKeyWarning');
+    if (w) w.style.display = anthropicKey ? 'none' : 'block';
+  }
 }
 
 // ── PRICE FETCHING ────────────────────────────────────────────────────────
@@ -312,6 +338,7 @@ var cadPerUsd = 1.36; // updated live on each price fetch
 var sortKey = 'mktValue';
 var sortDir = -1; // -1 = descending, 1 = ascending
 var hideAmounts = false;
+var anthropicKey = localStorage.getItem('vq_apikey') || '';
 
 var TSX_TICKERS = ['XGD','RY','TD','FTS','SVR','BCE','ENB','PRG','XIU','XIC','XEI','ZEB','ZWB','ZDV','CPX','SU','CNQ','BMO','BNS','CM','NA','MFC','SLF','FFH','ATD','CNR','CP','WN','L','MRU','EMP','DOL','CCL','CTC','THI','TRP','PPL','IPL','AQN','BIP','BAM','GWO','POW','IGM','IFC'];
 
@@ -394,6 +421,35 @@ function enrich() {
       color: COLORS[i % COLORS.length]
     });
   });
+}
+
+// ── API KEY MODAL ────────────────────────────────────────────────────────
+function showKeyModal() {
+  var modal = document.getElementById('keyModal');
+  modal.style.display = 'flex';
+  var input = document.getElementById('keyInput');
+  input.value = anthropicKey;
+  document.getElementById('keyStatus').textContent = anthropicKey ? '✅ Key is saved' : '';
+  document.getElementById('keyStatus').style.color = 'var(--green)';
+}
+
+function closeKeyModal() {
+  document.getElementById('keyModal').style.display = 'none';
+}
+
+function saveKey() {
+  var key = document.getElementById('keyInput').value.trim();
+  var status = document.getElementById('keyStatus');
+  if (!key.startsWith('sk-ant-')) {
+    status.textContent = '❌ Invalid key — should start with sk-ant-';
+    status.style.color = 'var(--red)';
+    return;
+  }
+  anthropicKey = key;
+  localStorage.setItem('vq_apikey', key);
+  status.textContent = '✅ Key saved!';
+  status.style.color = 'var(--green)';
+  setTimeout(closeKeyModal, 1000);
 }
 
 // ── HIDE AMOUNTS ─────────────────────────────────────────────────────────
@@ -824,9 +880,16 @@ async function sendAI() {
   aiHistory.push({ role: 'user', content: q });
 
   try {
+    if (!anthropicKey) {
+      document.getElementById(lid).remove();
+      box.innerHTML += '<div class="msg msg-a" style="color:var(--red)">⚠️ No API key set. Click the ⚙️ button in the header to add your Anthropic API key.</div>';
+      btn.disabled = false; btn.textContent = 'Ask →';
+      box.scrollTop = box.scrollHeight;
+      return;
+    }
     var resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
