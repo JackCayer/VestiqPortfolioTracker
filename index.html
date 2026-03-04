@@ -518,7 +518,7 @@ var COLORS     = ['#c8f04a','#4af0c8','#ff6b9d','#a78bfa','#ffa94d','#51cf66','#
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────
 function loadData() {
-  try { holdings = JSON.parse(localStorage.getItem('vq_holdings') || '[]'); } catch(e) { holdings = []; }
+  try { holdings = JSON.parse(localStorage.getItem('vq_holdings') || '[]'); holdings.forEach(function(h){ h.costUSD = false; }); } catch(e) { holdings = []; }
 }
 
 function saveData() {
@@ -642,7 +642,7 @@ async function fbLoad() {
     }
     var d = doc.data();
     // Write directly to localStorage without triggering fbSave loop
-    if (d.holdings)      { try { holdings      = JSON.parse(d.holdings);      localStorage.setItem('vq_holdings', d.holdings); }      catch(e){ console.error('holdings parse',e); } }
+    if (d.holdings)      { try { holdings      = JSON.parse(d.holdings);      holdings.forEach(function(h){ h.costUSD = false; }); localStorage.setItem('vq_holdings', d.holdings); }      catch(e){ console.error('holdings parse',e); } }
     if (d.contributions) { try { contributions = JSON.parse(d.contributions); localStorage.setItem('vq_contribs',  d.contributions); } catch(e){ console.error('contrib parse',e); } }
     if (d.transactions)  { try { transactions  = JSON.parse(d.transactions);  localStorage.setItem('vq_txns',     d.transactions); }  catch(e){ console.error('txn parse',e); } }
     if (d.sortKey) sortKey = d.sortKey;
