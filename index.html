@@ -676,7 +676,7 @@ function saveContribs() {
   if (firebaseDB) fbSave();
 }
 
-var TSX_TICKERS = ['XGD','RY','TD','FTS','SVR','BCE','ENB','PRG','XIU','XIC','XEI','ZEB','ZWB','ZDV','CPX','SU','CNQ','BMO','BNS','CM','NA','MFC','SLF','FFH','ATD','CNR','CP','WN','L','MRU','EMP','DOL','CCL','CTC','THI','TRP','PPL','IPL','AQN','BIP','BAM','GWO','POW','IGM','IFC'];
+var TSX_TICKERS = ['XGD','RY','TD','FTS','SVR','BCE','ENB','XIU','XIC','XEI','ZEB','ZWB','ZDV','CPX','SU','CNQ','BMO','BNS','CM','NA','MFC','SLF','FFH','ATD','CNR','CP','WN','L','MRU','EMP','DOL','CCL','CTC','THI','TRP','PPL','IPL','AQN','BIP','BAM','GWO','POW','IGM','IFC'];
 
 // TSXV-listed tickers — Yahoo Finance uses .V suffix and returns CAD prices
 var TSXV_TICKERS = ['FO','SVB','VET','AAB','ACB','APHA','BNK','CXB','GBR','HUT','MARA','NXE','PDN','PGM','SLR','SOY','SVM','TOI','VIVO','WPM'];
@@ -744,9 +744,8 @@ function enrich() {
   return holdings.map(function(h, i) {
     var p = prices[h.ticker] || { price: h.avgCost, change: 0, changePct: 0, name: h.ticker };
     var mktValue  = h.shares * p.price;
-    // If costUSD=true, avgCost is in USD — convert to CAD once here and nowhere else
-    var avgCostCAD = h.costUSD ? Math.round(h.avgCost * cadPerUsd * 100) / 100 : h.avgCost;
-    console.log('[ENRICH] ' + h.ticker + ' | stored avgCost: ' + h.avgCost + ' | costUSD: ' + h.costUSD + ' | cadPerUsd: ' + cadPerUsd + ' | avgCostCAD: ' + avgCostCAD);
+    // avgCost is always stored in CAD — no conversion needed
+    var avgCostCAD = h.avgCost;
     var costBasis = h.shares * avgCostCAD;
     var gain      = mktValue - costBasis;
     var gainPct   = costBasis ? (gain / costBasis) * 100 : 0;
@@ -996,7 +995,7 @@ function renderAll() {
         return '<tr>' +
           '<td><span class="badge">' + h.ticker + '</span></td>' +
           '<td>' + (hideAmounts ? '••••' : h.shares) + '</td>' +
-          '<td>' + (hideAmounts ? '••••••' : '$' + (h.avgCostCAD||h.avgCost).toFixed(2) + (h.costUSD ? ' <span style="font-size:9px;color:var(--accent2);background:rgba(74,240,200,.1);border:1px solid rgba(74,240,200,.2);border-radius:4px;padding:1px 5px">USD in</span>' : '')) + '</td>' +
+          '<td>' + (hideAmounts ? '••••••' : '$' + avgCostCAD.toFixed(2)) + '</td>' +
           '<td><strong>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—')) + '</strong> <span style="font-size:9px;color:var(--muted)">' + (h.currency || '') + '</span></td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain)) + '</td>' +
@@ -1014,7 +1013,7 @@ function renderAll() {
           '<td>' + (hideAmounts ? '<span style="font-family:var(--fm);font-size:13px">••••</span>' : '<input class="ifield" style="width:80px;padding:6px 8px" type="number" value="' + h.shares + '" onchange="upd(' + h.id + ',\'shares\',+this.value)"/>') + '</td>' +
           '<td>' +
             (hideAmounts ? '<span style="font-family:var(--fm);font-size:13px">••••••</span>' : '<input class="ifield" style="width:100px;padding:6px 8px" type="number" value="' + h.avgCost + '" onchange="upd(' + h.id + ',\'avgCost\',+this.value)"/>') +
-            '<div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--fm)">' + (hideAmounts ? '' : (h.costUSD ? '≈ $' + (h.avgCostCAD||h.avgCost).toFixed(2) + ' CAD live' : 'CAD')) + '</div>' +
+            '<div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--fm)">CAD</div>' +
           '</td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—')) + '</td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
@@ -1022,7 +1021,7 @@ function renderAll() {
           '<td>' + cpd(h.gainPct) + '</td>' +
           '<td style="white-space:nowrap">' +
             '<label style="font-size:11px;color:var(--muted);font-family:var(--fm);display:flex;align-items:center;gap:5px;margin-bottom:6px;cursor:pointer">' +
-            '<input type="checkbox" ' + (h.costUSD ? 'checked' : '') + ' onchange="upd(' + h.id + ',\'costUSD\',this.checked)" style="width:auto;accent-color:var(--accent2)"/> USD cost</label>' +
+            'CAD</label>' +
             '<button class="btn-del" onclick="del(' + h.id + ')">✕</button>' +
           '</td>' +
           '</tr>';
@@ -1317,7 +1316,7 @@ async function sendAI() {
   var ctx = data.map(function(h) {
     return '• ' + h.ticker + ' (' + (h.name||h.ticker) + '): ' + h.shares + ' shares @ avg $' + h.avgCost +
       ' | Current $' + (h.price ? h.price.toFixed(2) : 'N/A') +
-      ' | Avg Cost $' + (h.avgCostCAD||h.avgCost).toFixed(2) + ' CAD' + (h.costUSD ? ' (entered as USD)' : '') +
+      ' | Avg Cost $' + avgCostCAD.toFixed(2) + ' CAD' +
       ' | Value $' + h.mktValue.toFixed(2) +
       ' | Gain ' + h.gainPct.toFixed(1) + '%' +
       ' | Today ' + (h.changePct ? h.changePct.toFixed(2) : '0') + '%';
