@@ -301,7 +301,8 @@ canvas{max-height:250px !important}
       <div class="ctitle">📝 Paste CSV or Add Manually</div>
       <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:14px;line-height:1.7">
         Format: <code style="color:var(--accent2)">DATE, AMOUNT</code> one per line.<br>
-        e.g. <code style="color:var(--accent2)">2022-03-15, 2500.00</code>
+        e.g. <code style="color:var(--accent2)">2022-03-15, 2500.00</code><br>
+        Use negative for withdrawals: <code style="color:var(--red)">2023-06-01, -500.00</code>
       </p>
       <textarea id="contribPaste" class="ifield" rows="5" placeholder="2021-01-15,6000.00&#10;2022-01-10,6000.00&#10;2023-03-22,2500.00"></textarea>
       <button class="btn btn-a" onclick="importContribCSV()" style="width:100%;margin-top:10px">Import CSV</button>
@@ -313,7 +314,7 @@ canvas{max-height:250px !important}
     <div class="ctitle">➕ Add Single Contribution</div>
     <div class="form-row" style="grid-template-columns:1fr 1fr auto">
       <div><div class="flbl">Date</div><input id="cin-date" class="ifield" type="date"/></div>
-      <div><div class="flbl">Amount (CAD)</div><input id="cin-amt" class="ifield" type="number" placeholder="6000.00"/></div>
+      <div><div class="flbl">Amount (CAD)</div><input id="cin-amt" class="ifield" type="number" placeholder="6000.00 (use negative for withdrawals)"/></div>
       <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addContrib()">+ Add</button></div>
     </div>
   </div>
@@ -1115,7 +1116,7 @@ function renderContribs() {
     var annRet   = calcAnnualizedReturn(c.amount, estValue, c.date);
     return '<tr>' +
       '<td>' + c.date + '</td>' +
-      '<td>' + (hideAmounts ? '••••••' : '$' + c.amount.toFixed(2)) + '</td>' +
+      '<td>' + (hideAmounts ? '••••••' : '<span class="' + (c.amount < 0 ? 'dn' : '') + '">' + (c.amount < 0 ? '-$' + Math.abs(c.amount).toFixed(2) + ' <span style="font-size:9px;background:rgba(255,94,94,.1);border:1px solid rgba(255,94,94,.2);border-radius:4px;padding:1px 5px;color:var(--red)">withdrawal</span>' : '$' + c.amount.toFixed(2)) + '</span>') + '</td>' +
       '<td>' + daysHeld.toLocaleString() + ' days</td>' +
       '<td>' + (hideAmounts ? '••••••' : '$' + estValue.toFixed(2)) + '</td>' +
       '<td><span class="' + (retPct>=0?'up':'dn') + '">' + (retPct>=0?'+':'') + retPct.toFixed(2) + '%</span>' +
