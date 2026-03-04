@@ -128,6 +128,7 @@ canvas{max-height:250px !important}
   <button class="ntab"     id="tab-charts"    onclick="showTab('charts')">📈 Charts</button>
   <button class="ntab"     id="tab-ai"        onclick="showTab('ai')">🤖 AI Advisor</button>
   <button class="ntab"     id="tab-contrib"   onclick="showTab('contrib')">💰 Contributions</button>
+  <button class="ntab"     id="tab-txn"       onclick="showTab('txn')">📋 Transactions</button>
 </nav>
 
 <main>
@@ -281,6 +282,51 @@ canvas{max-height:250px !important}
   </div>
 </div>
 
+<!-- ══════════════ TRANSACTIONS ══════════════ -->
+<div id="pane-txn" class="pane">
+  <div class="two-col" style="margin-bottom:18px">
+    <div class="card">
+      <div class="ctitle">📋 Import Transaction Log</div>
+      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:14px">
+        Format: <code style="color:var(--accent2)">Date, Type, Ticker, Shares, Price_CAD, Amount_CAD, Notes</code><br>
+        Types: <code style="color:var(--accent2)">BUY SELL DIV CONT WD NRT</code>
+      </p>
+      <textarea id="txnPaste" class="ifield" rows="7" placeholder="2025-10-08,BUY,RY,0.0992,202.42,20.08,&#10;2025-10-09,DIV,RY,,,0.84,Dividend&#10;2025-11-13,SELL,ANIX,4.0000,,24.33,"></textarea>
+      <button class="btn btn-a" onclick="importTxnCSV()" style="width:100%;margin-top:10px">Import Transactions</button>
+      <div id="txnCsvStatus" class="smsg"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">📊 Transaction Summary</div>
+      <div id="txnSummary" style="font-family:var(--fm);font-size:13px;color:var(--muted);line-height:2">
+        No transactions imported yet.
+      </div>
+      <button class="btn btn-b" onclick="clearTxns()" style="margin-top:16px;width:100%">Clear All Transactions</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">📈 Per-Holding Lot Breakdown</div>
+    <div id="lotBreakdown" style="font-size:13px;color:var(--muted);font-family:var(--fm)">Import transactions to see lot-by-lot cost basis.</div>
+  </div>
+
+  <div class="card" style="overflow-x:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <div class="ctitle" style="margin:0">All Transactions</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="sort-btn on" id="txf-all"  onclick="setTxFilter('all')">All</button>
+        <button class="sort-btn"    id="txf-BUY"  onclick="setTxFilter('BUY')">Buys</button>
+        <button class="sort-btn"    id="txf-SELL" onclick="setTxFilter('SELL')">Sells</button>
+        <button class="sort-btn"    id="txf-DIV"  onclick="setTxFilter('DIV')">Dividends</button>
+        <button class="sort-btn"    id="txf-CONT" onclick="setTxFilter('CONT')">Contributions</button>
+      </div>
+    </div>
+    <table class="tbl">
+      <thead><tr><th>Date</th><th>Type</th><th>Ticker</th><th>Shares</th><th>Price (CAD)</th><th>Amount (CAD)</th><th>Notes</th></tr></thead>
+      <tbody id="txnBody"></tbody>
+    </table>
+  </div>
+</div>
+
 <!-- ══════════════ CONTRIBUTIONS ══════════════ -->
 <div id="pane-contrib" class="pane">
   <div class="two-col" style="margin-bottom:18px">
@@ -390,6 +436,7 @@ function showTab(name) {
     if (w) w.style.display = anthropicKey ? 'none' : 'block';
   }
   if (name === 'contrib') { renderContribs(); setTimeout(function(){ if(contributions.length) drawContribChart(enrich().reduce(function(s,h){return s+h.mktValue;},0), contributions.reduce(function(s,c){return s+c.amount;},0)); }, 100); }
+  if (name === 'txn') { renderTxns(); }
 }
 
 // ── PRICE FETCHING ────────────────────────────────────────────────────────
@@ -400,6 +447,16 @@ var sortDir = -1; // -1 = descending, 1 = ascending
 var hideAmounts = false;
 var anthropicKey = localStorage.getItem('vq_apikey') || '';
 var contributions = [];
+var transactions  = [];   // full transaction log
+var txFilter      = 'all';
+
+function loadTxns() {
+  try { transactions = JSON.parse(localStorage.getItem('vq_txns') || '[]'); } catch(e) { transactions = []; }
+}
+
+function saveTxns() {
+  localStorage.setItem('vq_txns', JSON.stringify(transactions));
+}
 
 function loadContribs() {
   try { contributions = JSON.parse(localStorage.getItem('vq_contribs') || '[]'); } catch(e) { contributions = []; }
@@ -986,6 +1043,215 @@ async function sendAI() {
   box.scrollTop = box.scrollHeight;
 }
 
+// ── TRANSACTIONS ─────────────────────────────────────────────────────────
+var TYPE_COLORS = { BUY:'var(--accent)', SELL:'var(--red)', DIV:'var(--accent2)', CONT:'var(--accent2)', WD:'var(--red)', NRT:'var(--red)', FPLINT:'var(--accent2)' };
+
+function parseTxnCSVText(text) {
+  var lines  = text.split(/\r?\n/);
+  var parsed = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    // Split respecting quoted fields
+    var parts = [];
+    var cur = '', inQ = false;
+    for (var c = 0; c < line.length; c++) {
+      if (line[c] === '"') { inQ = !inQ; }
+      else if (line[c] === ',' && !inQ) { parts.push(cur.trim()); cur = ''; }
+      else { cur += line[c]; }
+    }
+    parts.push(cur.trim());
+    if (parts.length < 2) continue;
+    var type = (parts[1] || '').toUpperCase().trim();
+    // Skip header row
+    if (type === 'TYPE') continue;
+    var date    = parts[0].trim();
+    var dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) continue;
+    var ticker  = (parts[2] || '').toUpperCase().trim();
+    var shares  = parseFloat(parts[3]) || 0;
+    var price   = parseFloat((parts[4]||'').replace(/[$, ]/g,'')) || 0;
+    var amount  = parseFloat((parts[5]||'').replace(/[$, ]/g,'')) || 0;
+    var notes   = (parts[6] || '').trim();
+    parsed.push({ id: Date.now()+Math.random(), date: date, type: type, ticker: ticker, shares: shares, price: price, amount: amount, notes: notes });
+  }
+  parsed.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+  return parsed;
+}
+
+function importTxnCSV() {
+  var text  = document.getElementById('txnPaste').value.trim();
+  var el    = document.getElementById('txnCsvStatus');
+  var parsed = parseTxnCSVText(text);
+  if (parsed.length > 0) {
+    transactions = parsed;
+    saveTxns();
+    el.textContent = '✅ Imported ' + parsed.length + ' transactions!';
+    el.style.color = 'var(--green)';
+    renderTxns();
+    // Update contrib chart with accurate historical data
+    if (contributions.length) renderContribs();
+  } else {
+    el.textContent = '⚠️ No valid rows found. Check format.';
+    el.style.color = 'var(--red)';
+  }
+}
+
+function clearTxns() {
+  if (!confirm('Clear all transactions?')) return;
+  transactions = []; saveTxns(); renderTxns();
+}
+
+function setTxFilter(f) {
+  txFilter = f;
+  document.querySelectorAll('[id^="txf-"]').forEach(function(b){ b.classList.remove('on'); });
+  var btn = document.getElementById('txf-' + f);
+  if (btn) btn.classList.add('on');
+  renderTxnTable();
+}
+
+// Build lot map: { TICKER: [ {date, shares, priceCad, amount}, ... ] }
+function buildLots() {
+  var lots = {};
+  transactions.forEach(function(t) {
+    if (t.type !== 'BUY' && t.type !== 'SELL') return;
+    if (!t.ticker) return;
+    if (!lots[t.ticker]) lots[t.ticker] = [];
+    lots[t.ticker].push({ date: t.date, shares: t.shares, priceCad: t.price, amount: t.amount, type: t.type });
+  });
+  return lots;
+}
+
+// Build exact portfolio value timeline from transactions
+// Returns array of { date, bookValue, cumContrib }
+function buildHistoricalTimeline() {
+  if (!transactions.length) return [];
+  // Replay transactions, tracking cash + holdings book value
+  var holdings = {}; // { TICKER: { shares, totalCost } }
+  var points   = [];
+  var cumContrib = 0;
+
+  transactions.forEach(function(t) {
+    var dateStr = t.date;
+    if (t.type === 'CONT') {
+      cumContrib += t.amount;
+    } else if (t.type === 'WD') {
+      cumContrib -= Math.abs(t.amount);
+    } else if (t.type === 'BUY' && t.ticker) {
+      if (!holdings[t.ticker]) holdings[t.ticker] = { shares: 0, totalCost: 0 };
+      holdings[t.ticker].shares    += t.shares;
+      holdings[t.ticker].totalCost += t.amount;
+    } else if (t.type === 'SELL' && t.ticker) {
+      if (holdings[t.ticker]) {
+        // Reduce proportionally
+        var pct = t.shares / holdings[t.ticker].shares;
+        holdings[t.ticker].totalCost -= holdings[t.ticker].totalCost * pct;
+        holdings[t.ticker].shares    -= t.shares;
+        if (holdings[t.ticker].shares <= 0) delete holdings[t.ticker];
+      }
+    }
+    // Book value = sum of all holding cost bases
+    var bookVal = Object.values(holdings).reduce(function(s,h){ return s + h.totalCost; }, 0);
+    points.push({ x: dateStr, bookValue: +bookVal.toFixed(2), cumContrib: +cumContrib.toFixed(2) });
+  });
+
+  // Add today's point using live market value
+  var data = enrich();
+  var liveVal = data.reduce(function(s,h){ return s + h.mktValue; }, 0);
+  var today = new Date().toISOString().split('T')[0];
+  points.push({ x: today, bookValue: +liveVal.toFixed(2), cumContrib: +cumContrib.toFixed(2) });
+
+  return points;
+}
+
+function renderLotBreakdown() {
+  var el = document.getElementById('lotBreakdown');
+  if (!el) return;
+  if (!transactions.length) { el.innerHTML = 'Import transactions to see lot-by-lot cost basis.'; return; }
+
+  var lots = buildLots();
+  var data = enrich();
+  var priceMap = {};
+  data.forEach(function(h){ priceMap[h.ticker] = h.price || 0; });
+
+  var html = '';
+  Object.keys(lots).sort().forEach(function(ticker) {
+    var tickerLots = lots[ticker].filter(function(l){ return l.type === 'BUY'; });
+    var sells      = lots[ticker].filter(function(l){ return l.type === 'SELL'; });
+    var totalSold  = sells.reduce(function(s,l){ return s+l.shares; }, 0);
+    var totalBought= tickerLots.reduce(function(s,l){ return s+l.shares; }, 0);
+    var currentShares = totalBought - totalSold;
+    if (currentShares <= 0.0001) return; // fully sold
+    var currentPrice = priceMap[ticker] || 0;
+
+    html += '<div style="margin-bottom:20px">';
+    html += '<div style="font-weight:700;color:var(--accent);font-family:var(--fm);margin-bottom:8px;font-size:13px">' +
+      ticker + ' <span style="color:var(--muted);font-weight:400">— ' + currentShares.toFixed(4) + ' shares held | Current: $' + currentPrice.toFixed(2) + ' CAD</span></div>';
+    html += '<table class="tbl" style="margin-bottom:0"><thead><tr>' +
+      '<th>Date</th><th>Shares</th><th>Price Paid (CAD)</th><th>Cost</th><th>Current Value</th><th>Gain $</th><th>Gain %</th>' +
+      '</tr></thead><tbody>';
+
+    tickerLots.forEach(function(lot) {
+      var lotValue = lot.shares * currentPrice;
+      var gain     = lotValue - lot.amount;
+      var gainPct  = lot.amount ? (gain / lot.amount) * 100 : 0;
+      html += '<tr>' +
+        '<td>' + lot.date + '</td>' +
+        '<td>' + lot.shares.toFixed(4) + '</td>' +
+        '<td>$' + (lot.priceCad ? lot.priceCad.toFixed(2) : (lot.amount/lot.shares).toFixed(2)) + '</td>' +
+        '<td>' + (hideAmounts ? '••••••' : '$' + lot.amount.toFixed(2)) + '</td>' +
+        '<td>' + (hideAmounts ? '••••••' : '$' + lotValue.toFixed(2)) + '</td>' +
+        '<td>' + (hideAmounts ? cpd(gainPct) : cd(gain)) + '</td>' +
+        '<td>' + cpd(gainPct) + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table></div>';
+  });
+
+  el.innerHTML = html || '<span style="color:var(--muted)">No open positions found in transaction log.</span>';
+}
+
+function renderTxnTable() {
+  var filtered = txFilter === 'all' ? transactions : transactions.filter(function(t){ return t.type === txFilter; });
+  var TYPE_BADGE = { BUY:'#c8f04a', SELL:'#ff5e5e', DIV:'#4af0c8', CONT:'#4af0c8', WD:'#ff5e5e', NRT:'#ff5e5e', FPLINT:'#4af0c8' };
+  document.getElementById('txnBody').innerHTML = filtered.length
+    ? filtered.map(function(t) {
+        var col = TYPE_BADGE[t.type] || '#888';
+        return '<tr>' +
+          '<td>' + t.date + '</td>' +
+          '<td><span style="font-size:10px;font-family:var(--fm);background:' + col + '22;color:' + col + ';border:1px solid ' + col + '44;border-radius:4px;padding:2px 7px">' + t.type + '</span></td>' +
+          '<td><span class="badge">' + (t.ticker || '—') + '</span></td>' +
+          '<td>' + (t.shares ? t.shares.toFixed(4) : '—') + '</td>' +
+          '<td>' + (t.price ? '$' + t.price.toFixed(2) : '—') + '</td>' +
+          '<td>' + (hideAmounts ? '••••••' : (t.amount ? (t.amount < 0 ? '-$'+Math.abs(t.amount).toFixed(2) : '$'+t.amount.toFixed(2)) : '—')) + '</td>' +
+          '<td style="color:var(--muted);font-size:11px">' + (t.notes || '') + '</td>' +
+          '</tr>';
+      }).join('')
+    : '<tr><td colspan="7" class="empty">No transactions' + (txFilter !== 'all' ? ' of type ' + txFilter : '') + '</td></tr>';
+}
+
+function renderTxnSummary() {
+  if (!transactions.length) { document.getElementById('txnSummary').textContent = 'No transactions imported yet.'; return; }
+  var buys  = transactions.filter(function(t){ return t.type==='BUY'; });
+  var sells = transactions.filter(function(t){ return t.type==='SELL'; });
+  var divs  = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; });
+  var totalBuy  = buys.reduce(function(s,t){ return s+t.amount; },0);
+  var totalSell = sells.reduce(function(s,t){ return s+t.amount; },0);
+  var totalDiv  = divs.reduce(function(s,t){ return s+t.amount; },0);
+  document.getElementById('txnSummary').innerHTML =
+    '<div>📅 <strong>' + transactions[0].date + '</strong> → <strong>' + transactions[transactions.length-1].date + '</strong></div>' +
+    '<div>🛒 <strong>' + buys.length + '</strong> buys totalling ' + (hideAmounts ? '••••••' : '$' + totalBuy.toFixed(2)) + '</div>' +
+    '<div>💸 <strong>' + sells.length + '</strong> sells totalling ' + (hideAmounts ? '••••••' : '$' + totalSell.toFixed(2)) + '</div>' +
+    '<div>💰 <strong>' + divs.length + '</strong> dividends totalling ' + (hideAmounts ? '••••••' : '$' + totalDiv.toFixed(2)) + '</div>' +
+    '<div>📊 <strong>' + new Set(buys.map(function(t){return t.ticker;})).size + '</strong> unique tickers traded</div>';
+}
+
+function renderTxns() {
+  renderTxnSummary();
+  renderTxnTable();
+  renderLotBreakdown();
+}
+
 // ── CONTRIBUTIONS ────────────────────────────────────────────────────────
 function addContrib() {
   var date = document.getElementById('cin-date').value;
@@ -1106,21 +1372,33 @@ function renderContribs() {
   document.getElementById('sv-hold').textContent = days.toLocaleString() + ' days';
   document.getElementById('sv-hold').nextElementSibling && (document.getElementById('sv-hold').nextElementSibling.textContent = 'since ' + firstDate);
 
-  // Per-contribution return estimate (proportional allocation)
-  var portionPerDollar = tv / totalContrib;
+  // Per-contribution return:
+  // We can't track exactly which dollars bought which stocks, so we assume
+  // all contributions earned the same portfolio-wide annualized rate, held
+  // for different durations. This is the standard approach for contribution accounting.
+  var portfolioCAGR = calcAnnualizedReturn(totalContrib, tv, firstDate); // overall annual rate
   var rows = contributions.map(function(c) {
-    var daysHeld = Math.round((new Date() - new Date(c.date)) / (1000 * 60 * 60 * 24));
-    var estValue = c.amount * portionPerDollar;
-    var ret      = estValue - c.amount;
-    var retPct   = (ret / c.amount) * 100;
-    var annRet   = calcAnnualizedReturn(c.amount, estValue, c.date);
+    var daysHeld  = Math.round((new Date() - new Date(c.date)) / (1000 * 60 * 60 * 24));
+    var yearsHeld = daysHeld / 365.25;
+    // Project this contribution forward at the portfolio's CAGR for its hold period
+    var estValue, retPct;
+    if (portfolioCAGR !== null && yearsHeld > 0 && c.amount > 0) {
+      estValue = c.amount * Math.pow(1 + portfolioCAGR / 100, yearsHeld);
+      retPct   = ((estValue - c.amount) / c.amount) * 100;
+    } else {
+      estValue = c.amount;
+      retPct   = 0;
+    }
+    var annRet = yearsHeld >= 0.05 && c.amount > 0 ? portfolioCAGR : null;
     return '<tr>' +
       '<td>' + c.date + '</td>' +
       '<td>' + (hideAmounts ? '••••••' : '<span class="' + (c.amount < 0 ? 'dn' : '') + '">' + (c.amount < 0 ? '-$' + Math.abs(c.amount).toFixed(2) + ' <span style="font-size:9px;background:rgba(255,94,94,.1);border:1px solid rgba(255,94,94,.2);border-radius:4px;padding:1px 5px;color:var(--red)">withdrawal</span>' : '$' + c.amount.toFixed(2)) + '</span>') + '</td>' +
       '<td>' + daysHeld.toLocaleString() + ' days</td>' +
-      '<td>' + (hideAmounts ? '••••••' : '$' + estValue.toFixed(2)) + '</td>' +
-      '<td><span class="' + (retPct>=0?'up':'dn') + '">' + (retPct>=0?'+':'') + retPct.toFixed(2) + '%</span>' +
-        (annRet !== null ? ' <span style="font-size:10px;color:var(--muted)">(' + (annRet>=0?'+':'') + annRet.toFixed(1) + '%/yr)</span>' : '') +
+      '<td>' + (hideAmounts ? '••••••' : (c.amount > 0 ? '$' + estValue.toFixed(2) : '—')) + '</td>' +
+      '<td>' + (c.amount > 0 ?
+        '<span class="' + (retPct>=0?'up':'dn') + '">' + (retPct>=0?'+':'') + retPct.toFixed(2) + '%</span>' +
+        (annRet !== null ? ' <span style="font-size:10px;color:var(--muted)">(' + (annRet>=0?'+':'') + annRet.toFixed(1) + '%/yr annualized)</span>' : '')
+        : '<span style="color:var(--muted)">—</span>') +
       '</td>' +
       '<td><button class="btn-del" onclick="delContrib(' + c.id + ')">✕</button></td>' +
       '</tr>';
@@ -1132,27 +1410,33 @@ function renderContribs() {
 }
 
 function drawContribChart(currentValue, totalContrib) {
-  // Build cumulative contribution line over time
+  // Build cumulative contribution line from contributions
   var points = [];
   var cumulative = 0;
   contributions.forEach(function(c) {
     cumulative += c.amount;
     points.push({ x: c.date, y: +cumulative.toFixed(2) });
   });
-  // Add today's point
   var today = new Date().toISOString().split('T')[0];
   points.push({ x: today, y: +totalContrib.toFixed(2) });
 
-  // Estimate portfolio value growth linearly between first contribution and today
-  var firstDate = new Date(contributions[0].date);
-  var now = new Date();
-  var totalDays = (now - firstDate) / (1000 * 60 * 60 * 24);
-  var valuePoints = contributions.map(function(c, i) {
-    var daysIn = (new Date(c.date) - firstDate) / (1000 * 60 * 60 * 24);
-    var frac   = totalDays > 0 ? daysIn / totalDays : 0;
-    return { x: c.date, y: +(currentValue * (0.3 + 0.7 * frac)).toFixed(2) };
-  });
-  valuePoints.push({ x: today, y: +currentValue.toFixed(2) });
+  // Use exact historical timeline from transactions if available, else linear estimate
+  var valuePoints;
+  if (transactions.length > 0) {
+    var timeline = buildHistoricalTimeline();
+    valuePoints = timeline.map(function(p){ return { x: p.x, y: p.bookValue }; });
+  } else {
+    // Fallback: linear estimate
+    var firstDate = new Date(contributions[0].date);
+    var now = new Date();
+    var totalDays = (now - firstDate) / (1000 * 60 * 60 * 24);
+    valuePoints = contributions.map(function(c) {
+      var daysIn = (new Date(c.date) - firstDate) / (1000 * 60 * 60 * 24);
+      var frac   = totalDays > 0 ? daysIn / totalDays : 0;
+      return { x: c.date, y: +(currentValue * (0.3 + 0.7 * frac)).toFixed(2) };
+    });
+    valuePoints.push({ x: today, y: +currentValue.toFixed(2) });
+  }
 
   if (myCharts['cContrib']) myCharts['cContrib'].destroy();
   var el = document.getElementById('cContrib');
@@ -1179,6 +1463,7 @@ function drawContribChart(currentValue, totalContrib) {
 // ── INIT ──────────────────────────────────────────────────────────────────
 loadData();
 loadContribs();
+loadTxns();
 fetchPrices();
 setInterval(fetchPrices, 15000);
 </script>
