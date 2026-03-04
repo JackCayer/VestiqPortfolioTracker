@@ -1689,16 +1689,12 @@ function rebuildHoldingsFromTxns() {
     }
   });
 
-  // Also sync contributions from CONT transactions
+  // Fully rebuild contributions from CONT/WD transactions — replace entirely
   var contTxns = transactions.filter(function(t){ return t.type === 'CONT' || t.type === 'WD'; });
   if (contTxns.length) {
-    // Merge with existing contributions — add any not already present by date+amount
-    contTxns.forEach(function(t) {
+    contributions = contTxns.map(function(t) {
       var amount = t.type === 'WD' ? -Math.abs(t.amount) : t.amount;
-      var alreadyExists = contributions.some(function(c){ return c.date === t.date && Math.abs(c.amount - amount) < 0.01; });
-      if (!alreadyExists) {
-        contributions.push({ id: Date.now() + Math.random(), date: t.date, amount: amount });
-      }
+      return { id: t.id || (Date.now() + Math.random()), date: t.date, amount: amount, notes: t.notes || '' };
     });
     contributions.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
     localStorage.setItem('vq_contribs', JSON.stringify(contributions));
