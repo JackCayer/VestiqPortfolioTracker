@@ -1452,7 +1452,14 @@ function buildLots() {
     if (t.type !== 'BUY' && t.type !== 'SELL') return;
     if (!t.ticker) return;
     if (!lots[t.ticker]) lots[t.ticker] = [];
-    lots[t.ticker].push({ date: t.date, shares: t.shares, priceCad: t.price, amount: t.amount, type: t.type });
+    // Extract fxRate from stored field or notes
+    var txFx = t.fxRate || 0;
+    if (!txFx && t.notes) {
+      var fxM = t.notes.match(/FX\s*(?:Rate[:\s]*)?([\.\d]+)/i);
+      if (fxM) txFx = parseFloat(fxM[1]);
+    }
+    var costPerShare = t.price > 0 ? t.price : (t.shares > 0 ? t.amount / t.shares : 0);
+    lots[t.ticker].push({ date: t.date, shares: t.shares, priceCad: t.price, costPerShare: costPerShare, totalCost: t.amount, amount: t.amount, fxRate: txFx, type: t.type });
   });
   return lots;
 }
