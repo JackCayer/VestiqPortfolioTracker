@@ -1004,8 +1004,7 @@ function delContrib(id) {
 }
 
 function parseContribCSVText(text) {
-  var lines  = text.split(/?
-/);
+  var lines  = text.split(/\r?\n/);
   var parsed = [];
   for (var i = 0; i < lines.length; i++) {
     var line  = lines[i].trim();
