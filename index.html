@@ -1617,16 +1617,25 @@ function renderTxns() {
 
 // ── REBUILD HOLDINGS FROM TRANSACTIONS ───────────────────────────────────
 // Replays all BUY/SELL transactions to compute exact holdings with weighted avg cost
-function doRebuild() {
+async function doRebuild() {
   if (!transactions.length) { showToast('⚠️ No transactions to rebuild from', true); return; }
+  showToast('⏳ Rebuilding holdings...');
   rebuildHoldingsFromTxns();
-  showToast('⏳ Rebuilding — fetching prices...');
-  fetchPrices().then(function() {
-    renderAll();
-    renderContribs();
-    renderDividends();
-    showToast('✅ Holdings rebuilt — ' + holdings.length + ' positions');
-  });
+  // Explicitly save to localStorage and wait for Firebase to confirm
+  saveData();
+  if (firebaseDB) {
+    try {
+      await fbSave();
+      showToast('⏳ Saved — fetching prices...');
+    } catch(e) {
+      showToast('⚠️ Firebase save failed: ' + e.message, true);
+    }
+  }
+  await fetchPrices();
+  renderAll();
+  renderContribs();
+  renderDividends();
+  showToast('✅ Rebuilt ' + holdings.length + ' positions & synced to cloud');
 }
 
 function rebuildHoldingsFromTxns() {
@@ -2239,20 +2248,32 @@ loadData();
 loadContribs();
 loadTxns();
 loadFirebaseConfig();
-// Init Firebase — always pull cloud data on page load if connected
+// Init Firebase — pull on load only if we have no local transactions
+// If local data exists, use it and sync in background
 if (firebaseConfig) {
   var fbOk = initFirebase();
   if (fbOk) {
-    fbLoad().then(function(loaded) {
-      if (loaded) {
-        renderAll();
-        setTimeout(function(){
-          if (contributions.length) renderContribs();
-          if (transactions.length)  renderTxns();
-        }, 100);
-      }
+    var hasLocalData = transactions.length > 0 || holdings.length > 0;
+    if (hasLocalData) {
+      // Use local data immediately, sync to Firebase in background
       fetchPrices();
-    });
+      setTimeout(function(){
+        if (contributions.length) renderContribs();
+        if (transactions.length)  renderTxns();
+      }, 100);
+    } else {
+      // No local data — pull from Firebase
+      fbLoad().then(function(loaded) {
+        if (loaded) {
+          renderAll();
+          setTimeout(function(){
+            if (contributions.length) renderContribs();
+            if (transactions.length)  renderTxns();
+          }, 100);
+        }
+        fetchPrices();
+      });
+    }
   } else {
     fetchPrices();
   }
