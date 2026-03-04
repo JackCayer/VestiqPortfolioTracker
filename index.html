@@ -102,6 +102,8 @@ canvas{max-height:250px !important}
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.del-btn { background:transparent;border:none;color:#555;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px; }
+.del-btn:hover { color:#ff5e5e; }
 </style>
 </head>
 <body>
@@ -313,10 +315,10 @@ canvas{max-height:250px !important}
 
   <div class="card" style="margin-bottom:18px">
     <div class="ctitle">➕ Add Single Transaction</div>
-    <div class="form-row" style="grid-template-columns:120px 100px 100px 100px 1fr auto;gap:10px">
+    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
       <div><div class="flbl">Date</div><input id="txn-date" class="ifield" type="date"/></div>
       <div><div class="flbl">Type</div>
-        <select id="txn-type" class="ifield" style="padding:8px">
+        <select id="txn-type" class="ifield" style="padding:8px" onchange="updateTxnForm()">
           <option value="BUY">BUY</option>
           <option value="SELL">SELL</option>
           <option value="DIV">DIV</option>
@@ -325,20 +327,20 @@ canvas{max-height:250px !important}
           <option value="NRT">NRT</option>
         </select>
       </div>
-      <div><div class="flbl">Ticker</div><input id="txn-ticker" class="ifield" placeholder="e.g. RY" oninput="this.value=this.value.toUpperCase()"/></div>
-      <div><div class="flbl">Shares</div><input id="txn-shares" class="ifield" type="number" placeholder="0.0000" step="0.0001"/></div>
-      <div><div class="flbl">Price (CAD)</div><input id="txn-price" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
-      <div><div class="flbl">Amount (CAD)</div><input id="txn-amount" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:10px;align-items:flex-end;flex-wrap:wrap">
-      <div style="flex:1"><div class="flbl">Notes (optional)</div><input id="txn-notes" class="ifield" placeholder="e.g. Dividend reinvested, FX 1.42"/></div>
-      <div><div class="flbl">Price Currency</div>
+      <div id="txnf-ticker"><div class="flbl">Ticker</div><input id="txn-ticker" class="ifield" placeholder="e.g. RY" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div id="txnf-shares"><div class="flbl">Shares</div><input id="txn-shares" class="ifield" type="number" placeholder="0.0000" step="0.0001"/></div>
+      <div id="txnf-price"><div class="flbl">Price</div><input id="txn-price" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
+      <div id="txnf-currency"><div class="flbl">Currency</div>
         <select id="txn-usd" class="ifield" style="padding:8px">
-          <option value="cad">Price in CAD</option>
-          <option value="usd">Price in USD</option>
+          <option value="cad">CAD</option>
+          <option value="usd">USD</option>
         </select>
       </div>
-      <div><div class="flbl">FX Rate (USD only)</div><input id="txn-fx" class="ifield" type="number" placeholder="e.g. 1.42" step="0.0001" style="width:110px"/></div>
+      <div id="txnf-fx"><div class="flbl">FX Rate</div><input id="txn-fx" class="ifield" type="number" placeholder="e.g. 1.42" step="0.0001" style="width:100px"/></div>
+      <div id="txnf-amount"><div class="flbl">Amount (CAD)</div><input id="txn-amount" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1"><div class="flbl">Notes (optional)</div><input id="txn-notes" class="ifield" placeholder="optional"/></div>
       <button class="btn btn-a" onclick="addSingleTxn()" style="white-space:nowrap;padding:10px 20px">+ Add</button>
     </div>
     <div id="txnAddStatus" class="smsg"></div>
@@ -377,7 +379,10 @@ canvas{max-height:250px !important}
   </div>
 
   <div class="section-hdr" style="margin-bottom:14px">Dividend Income by Ticker</div>
-  <div class="card" style="margin-bottom:22px"><canvas id="cDividends" style="max-height:220px !important"></canvas></div>
+  <div class="two-col" style="margin-bottom:22px">
+    <div class="card"><div style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:10px">Income by Ticker</div><canvas id="cDividends" style="max-height:200px !important"></canvas></div>
+    <div class="card"><div style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:10px">Income by Month</div><canvas id="cDivMonthly" style="max-height:200px !important"></canvas></div>
+  </div>
 
   <div class="card" style="overflow-x:auto">
     <div class="ctitle">Dividend History</div>
@@ -537,7 +542,7 @@ function showTab(name) {
     if (w) w.style.display = anthropicKey ? 'none' : 'block';
   }
   if (name === 'contrib') { renderContribs(); setTimeout(function(){ if(contributions.length) drawContribChart(enrich().reduce(function(s,h){return s+h.mktValue;},0), contributions.reduce(function(s,c){return s+c.amount;},0)); }, 100); }
-  if (name === 'txn') { renderTxns(); }
+  if (name === 'txn') { renderTxns(); updateTxnForm(); }
   if (name === 'div') { renderDividends(); setTimeout(function(){ if(transactions.length) drawDividendChart(Object.values((function(){var b={};transactions.filter(function(t){return t.type==='DIV'||t.type==='FPLINT';}).forEach(function(t){var k=t.ticker||'OTHER';if(!b[k])b[k]={total:0,ticker:k};b[k].total+=t.amount;});return b;})()).sort(function(a,b){return b.total-a.total;})); }, 100); }
 }
 
@@ -995,7 +1000,7 @@ function renderAll() {
         return '<tr>' +
           '<td><span class="badge">' + h.ticker + '</span></td>' +
           '<td>' + (hideAmounts ? '••••' : h.shares) + '</td>' +
-          '<td>' + (hideAmounts ? '••••••' : '$' + avgCostCAD.toFixed(2)) + '</td>' +
+          '<td>' + (hideAmounts ? '••••••' : '$' + avgCostCAD.toFixed(2) + ' <span style="font-size:9px;font-family:var(--fm);color:var(--muted);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">CAD</span>') + '</td>' +
           '<td><strong>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—')) + '</strong> <span style="font-size:9px;color:var(--muted)">' + (h.currency || '') + '</span></td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain)) + '</td>' +
@@ -1015,7 +1020,7 @@ function renderAll() {
             (hideAmounts ? '<span style="font-family:var(--fm);font-size:13px">••••••</span>' : '<input class="ifield" style="width:100px;padding:6px 8px" type="number" value="' + h.avgCost + '" onchange="upd(' + h.id + ',\'avgCost\',+this.value)"/>') +
             '<div style="font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--fm)">CAD</div>' +
           '</td>' +
-          '<td>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—')) + '</td>' +
+          '<td>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—') + ' <span style="font-size:9px;font-family:var(--fm);color:' + (p.currency === 'USD→CAD' ? 'var(--accent2)' : 'var(--muted)') + ';background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">' + (p.currency || 'CAD') + '</span>') + '</td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain)) + '</td>' +
           '<td>' + cpd(h.gainPct) + '</td>' +
@@ -1561,6 +1566,7 @@ function renderTxnTable() {
   document.getElementById('txnBody').innerHTML = filtered.length
     ? filtered.map(function(t) {
         var col = TYPE_BADGE[t.type] || '#888';
+        var tid = JSON.stringify(t.id);
         return '<tr>' +
           '<td>' + t.date + '</td>' +
           '<td><span style="font-size:10px;font-family:var(--fm);background:' + col + '22;color:' + col + ';border:1px solid ' + col + '44;border-radius:4px;padding:2px 7px">' + t.type + '</span></td>' +
@@ -1569,9 +1575,19 @@ function renderTxnTable() {
           '<td>' + (t.price ? '$' + t.price.toFixed(2) : '—') + '</td>' +
           '<td>' + (hideAmounts ? '••••••' : (t.amount ? (t.amount < 0 ? '-$'+Math.abs(t.amount).toFixed(2) : '$'+t.amount.toFixed(2)) : '—')) + '</td>' +
           '<td style="color:var(--muted);font-size:11px">' + (t.notes || '') + '</td>' +
+          '<td><button class="del-btn" onclick="deleteTxn(' + tid + ')">✕</button></td>' +
           '</tr>';
       }).join('')
-    : '<tr><td colspan="7" class="empty">No transactions' + (txFilter !== 'all' ? ' of type ' + txFilter : '') + '</td></tr>';
+    : '<tr><td colspan="8" class="empty">No transactions' + (txFilter !== 'all' ? ' of type ' + txFilter : '') + '</td></tr>';
+}
+
+function deleteTxn(id) {
+  transactions = transactions.filter(function(t){ return t.id !== id; });
+  saveTxns();
+  rebuildHoldingsFromTxns();
+  renderAll();
+  renderTxns();
+  renderDividends();
 }
 
 function renderTxnSummary() {
@@ -1693,6 +1709,53 @@ function rebuildHoldingsFromTxns() {
   console.log('[REBUILD] Holdings rebuilt from transactions:', newHoldings.map(function(h){ return h.ticker + ' avgCost=$' + h.avgCost + ' CAD shares=' + h.shares; }));
   if (firebaseDB) fbSave();
   return holdings;
+}
+
+// ── DYNAMIC TRANSACTION FORM ─────────────────────────────────────────────
+var TXN_FIELDS = {
+  // type: [show ticker, show shares, show price, show currency, show fx, show amount]
+  BUY:  [true,  true,  true,  true,  true,  true],
+  SELL: [true,  true,  true,  false, false, true],
+  DIV:  [true,  false, false, false, true,  true],
+  CONT: [false, false, false, false, false, true],
+  WD:   [false, false, false, false, false, true],
+  NRT:  [false, false, false, false, false, true],
+};
+
+function updateTxnForm() {
+  var type = document.getElementById('txn-type').value;
+  var cfg  = TXN_FIELDS[type] || [true, true, true, true, true, true];
+  var ids  = ['txnf-ticker','txnf-shares','txnf-price','txnf-currency','txnf-fx','txnf-amount'];
+  ids.forEach(function(id, i) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = cfg[i] ? '' : 'none';
+  });
+  // Update amount label
+  var amtLabel = document.querySelector('#txnf-amount .flbl');
+  if (amtLabel) {
+    if (type === 'CONT') amtLabel.textContent = 'Amount (CAD)';
+    else if (type === 'WD') amtLabel.textContent = 'Amount (CAD, positive)';
+    else if (type === 'DIV') amtLabel.textContent = 'Dividend (CAD)';
+    else if (type === 'NRT') amtLabel.textContent = 'Tax Withheld (CAD)';
+    else amtLabel.textContent = 'Amount (CAD)';
+  }
+}
+
+// ── DELETE MANUAL ENTRIES ─────────────────────────────────────────────────
+function deleteManualEntries() {
+  var txnCount    = transactions.filter(function(t){ return t.notes && t.notes.toLowerCase().includes('manual'); }).length;
+  var contCount   = contributions.filter(function(c){ return c.notes && c.notes.toLowerCase().includes('manual'); }).length;
+  if (txnCount + contCount === 0) { showToast('⚠️ No manual entries found'); return; }
+  if (!confirm('Delete ' + txnCount + ' manual transactions and ' + contCount + ' manual contributions?')) return;
+  transactions  = transactions.filter(function(t){ return !(t.notes && t.notes.toLowerCase().includes('manual')); });
+  contributions = contributions.filter(function(c){ return !(c.notes && c.notes.toLowerCase().includes('manual')); });
+  saveTxns();
+  saveContribs();
+  rebuildHoldingsFromTxns();
+  renderAll();
+  renderTxns();
+  renderContribs();
+  showToast('✅ Manual entries deleted');
 }
 
 // ── ADD SINGLE TRANSACTION ───────────────────────────────────────────────
@@ -1865,15 +1928,62 @@ function renderDividends() {
 
   // Full history
   document.getElementById('divHistBody').innerHTML = filteredDivs.slice().reverse().map(function(t) {
+    var tid = JSON.stringify(t.id);
     return '<tr>' +
       '<td>' + t.date + '</td>' +
       '<td><span class="badge">' + (t.ticker||'—') + '</span></td>' +
       '<td><span class="up">' + (hideAmounts ? '••••••' : '$' + t.amount.toFixed(2)) + '</span></td>' +
       '<td style="color:var(--muted);font-size:11px">' + (t.notes||'') + '</td>' +
+      '<td><button class="del-btn" onclick="deleteTxn(' + tid + ')">✕</button></td>' +
       '</tr>';
   }).join('');
 
   drawDividendChart(tickerList);
+  drawDivMonthlyChart(filteredDivs);
+}
+
+function drawDivMonthlyChart(divTxns) {
+  if (myCharts['cDivMonthly']) myCharts['cDivMonthly'].destroy();
+  var el = document.getElementById('cDivMonthly');
+  if (!el || !divTxns.length) return;
+
+  // Aggregate by YYYY-MM
+  var byMonth = {};
+  divTxns.forEach(function(t) {
+    var m = t.date.substr(0, 7); // "2025-11"
+    byMonth[m] = (byMonth[m] || 0) + t.amount;
+  });
+
+  // Fill in any missing months between first and last
+  var keys = Object.keys(byMonth).sort();
+  var first = new Date(keys[0] + '-01');
+  var last  = new Date(keys[keys.length-1] + '-01');
+  var labels = [], values = [];
+  for (var d = new Date(first); d <= last; d.setMonth(d.getMonth()+1)) {
+    var key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    labels.push(key);
+    values.push(+(byMonth[key] || 0).toFixed(2));
+  }
+
+  myCharts['cDivMonthly'] = new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Dividends (CAD)',
+        data: values,
+        backgroundColor: 'rgba(74,240,200,.7)',
+        borderRadius: 5
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color:'#1e2030' }, ticks: { color:'#555', font:{ size:10 } } },
+        y: { grid: { color:'#1e2030' }, ticks: { color:'#555', callback: function(v){ return hideAmounts ? '••' : '$'+v.toFixed(2); } }, beginAtZero: true }
+      }
+    }
+  });
 }
 
 function drawDividendChart(tickerList) {
