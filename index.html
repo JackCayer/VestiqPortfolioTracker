@@ -329,8 +329,15 @@ canvas{max-height:250px !important}
       <div><div class="flbl">Price (CAD)</div><input id="txn-price" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
       <div><div class="flbl">Amount (CAD)</div><input id="txn-amount" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
     </div>
-    <div style="display:flex;gap:10px;margin-top:10px;align-items:flex-end">
+    <div style="display:flex;gap:10px;margin-top:10px;align-items:flex-end;flex-wrap:wrap">
       <div style="flex:1"><div class="flbl">Notes (optional)</div><input id="txn-notes" class="ifield" placeholder="e.g. Dividend reinvested, FX 1.42"/></div>
+      <div><div class="flbl">Price Currency</div>
+        <select id="txn-usd" class="ifield" style="padding:8px">
+          <option value="cad">Price in CAD</option>
+          <option value="usd">Price in USD</option>
+        </select>
+      </div>
+      <div><div class="flbl">FX Rate (USD only)</div><input id="txn-fx" class="ifield" type="number" placeholder="e.g. 1.42" step="0.0001" style="width:110px"/></div>
       <button class="btn btn-a" onclick="addSingleTxn()" style="white-space:nowrap;padding:10px 20px">+ Add</button>
     </div>
     <div id="txnAddStatus" class="smsg"></div>
@@ -379,7 +386,19 @@ canvas{max-height:250px !important}
     </table>
   </div>
 
-  <div class="card" style="margin-top:18px;overflow-x:auto">
+  <div class="card" style="margin-top:18px;margin-bottom:18px">
+    <div class="ctitle">➕ Add Dividend Payment Manually</div>
+    <div class="form-row" style="grid-template-columns:130px 1fr 120px 120px auto;gap:10px">
+      <div><div class="flbl">Date</div><input id="div-date" class="ifield" type="date"/></div>
+      <div><div class="flbl">Ticker</div><input id="div-ticker" class="ifield" placeholder="e.g. RY" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div><div class="flbl">Amount (CAD)</div><input id="div-amount" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
+      <div><div class="flbl">FX Rate (if USD div)</div><input id="div-fx" class="ifield" type="number" placeholder="e.g. 1.42" step="0.0001"/></div>
+      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addManualDiv()">+ Add</button></div>
+    </div>
+    <div id="divAddStatus" class="smsg"></div>
+  </div>
+
+  <div class="card" style="margin-top:0px;overflow-x:auto">
     <div class="ctitle">All Dividend Payments</div>
     <table class="tbl">
       <thead><tr><th>Date</th><th>Ticker</th><th>Amount</th><th>Notes</th></tr></thead>
@@ -1572,7 +1591,15 @@ function addSingleTxn() {
   var price  = parseFloat(document.getElementById('txn-price').value)  || 0;
   var amount = parseFloat(document.getElementById('txn-amount').value) || 0;
   var notes  = document.getElementById('txn-notes').value.trim();
+  var isUSD  = document.getElementById('txn-usd').value === 'usd';
+  var fx     = parseFloat(document.getElementById('txn-fx').value) || cadPerUsd;
   var status = document.getElementById('txnAddStatus');
+  // If price in USD, convert price only — amount stays as entered in CAD
+  if (isUSD && fx && price > 0) {
+    price = Math.round(price * fx * 100) / 100;
+    if (!notes) notes = 'FX ' + fx.toFixed(4);
+    else notes += ' | FX ' + fx.toFixed(4);
+  }
 
   if (!date) { status.textContent = '⚠️ Date is required'; status.style.color='var(--red)'; return; }
   if (!type) { status.textContent = '⚠️ Type is required'; status.style.color='var(--red)'; return; }
@@ -1588,6 +1615,8 @@ function addSingleTxn() {
   document.getElementById('txn-price').value  = '';
   document.getElementById('txn-amount').value = '';
   document.getElementById('txn-notes').value  = '';
+  document.getElementById('txn-fx').value  = '';
+  document.getElementById('txn-usd').value = 'cad';
 
   status.textContent = '✅ Transaction added!';
   status.style.color = 'var(--green)';
@@ -1596,75 +1625,120 @@ function addSingleTxn() {
 }
 
 // ── DIVIDENDS ─────────────────────────────────────────────────────────────
+function addManualDiv() {
+  var date   = document.getElementById('div-date').value;
+  var ticker = document.getElementById('div-ticker').value.trim().toUpperCase();
+  var amount = parseFloat(document.getElementById('div-amount').value) || 0;
+  var fx     = parseFloat(document.getElementById('div-fx').value) || 0;
+  var status = document.getElementById('divAddStatus');
+  if (!date || !ticker || amount <= 0) {
+    status.textContent = '⚠️ Date, ticker and amount are required';
+    status.style.color = 'var(--red)'; return;
+  }
+  var notes = fx > 0 ? 'Manual entry | FX ' + fx.toFixed(4) : 'Manual entry';
+  var finalAmount = fx > 0 ? Math.round(amount * fx * 100) / 100 : amount;
+  transactions.push({ id: Date.now()+Math.random(), date: date, type: 'DIV', ticker: ticker, shares: 0, price: 0, amount: finalAmount, notes: notes });
+  transactions.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+  saveTxns();
+  document.getElementById('div-date').value   = '';
+  document.getElementById('div-ticker').value = '';
+  document.getElementById('div-amount').value = '';
+  document.getElementById('div-fx').value     = '';
+  status.textContent = '✅ Dividend added!';
+  status.style.color = 'var(--green)';
+  setTimeout(function(){ status.textContent=''; }, 2000);
+  renderDividends();
+}
+
 function renderDividends() {
   var divTxns = transactions.filter(function(t){ return t.type==='DIV' || t.type==='FPLINT'; });
-  if (!divTxns.length) {
+
+  // Only show tickers we currently hold
+  var data     = enrich();
+  var heldSet  = {};
+  data.forEach(function(h){ heldSet[h.ticker] = h; });
+
+  // Filter to held tickers only (plus keep FPLINT)
+  var filteredDivs = divTxns.filter(function(t){ return !t.ticker || t.ticker==='FPLINT' || heldSet[t.ticker]; });
+
+  if (!filteredDivs.length) {
     document.getElementById('dv-total').textContent   = '$0.00';
-    document.getElementById('dv-count').textContent   = 'No dividend transactions found';
+    document.getElementById('dv-count').textContent   = transactions.length ? 'No dividends for current holdings' : 'Import transaction log first';
     document.getElementById('dv-best').textContent    = '—';
     document.getElementById('dv-monthly').textContent = '—';
     document.getElementById('dv-tickers').textContent = '0';
-    document.getElementById('divBody').innerHTML      = '<tr><td colspan="6" class="empty">No dividends found — import your transaction log</td></tr>';
-    document.getElementById('divHistBody').innerHTML  = '<tr><td colspan="4" class="empty">No dividends found</td></tr>';
+    document.getElementById('divBody').innerHTML      = '<tr><td colspan="7" class="empty">No dividends found for current holdings</td></tr>';
+    document.getElementById('divHistBody').innerHTML  = '<tr><td colspan="5" class="empty">No dividends found</td></tr>';
     return;
   }
 
   // Aggregate by ticker
   var byTicker = {};
-  divTxns.forEach(function(t) {
+  filteredDivs.forEach(function(t) {
     var k = t.ticker || 'OTHER';
     if (!byTicker[k]) byTicker[k] = { total: 0, payments: [], ticker: k };
     byTicker[k].total += t.amount;
     byTicker[k].payments.push(t);
   });
 
-  var totalDiv   = divTxns.reduce(function(s,t){ return s+t.amount; }, 0);
-  var tickerList = Object.values(byTicker).sort(function(a,b){ return b.total-a.total; });
-  var bestPayer  = tickerList[0];
+  var totalDiv   = filteredDivs.reduce(function(s,t){ return s+t.amount; }, 0);
+  var months     = Math.max(1, (new Date()-new Date(filteredDivs[0].date))/(1000*60*60*24*30.44));
+  var monthly    = totalDiv / months;
 
-  // Monthly average
-  var firstDiv = divTxns[0].date;
-  var months   = Math.max(1, (new Date()-new Date(firstDiv))/(1000*60*60*24*30.44));
-  var monthly  = totalDiv / months;
-
-  // Get current holdings for yield calculation
-  var data     = enrich();
-  var mktMap   = {};
-  data.forEach(function(h){ mktMap[h.ticker] = h.mktValue; });
-
-  // Update stat cards
-  document.getElementById('dv-total').textContent      = hideAmounts ? '••••••' : '$' + totalDiv.toFixed(2);
-  document.getElementById('dv-count').textContent      = divTxns.length + ' payments across ' + tickerList.length + ' tickers';
-  document.getElementById('dv-best').textContent       = bestPayer.ticker;
-  document.getElementById('dv-best-sub').textContent   = hideAmounts ? '••••••' : '$' + bestPayer.total.toFixed(2) + ' total received';
-  document.getElementById('dv-monthly').textContent    = hideAmounts ? '••••••' : '$' + monthly.toFixed(2);
-  document.getElementById('dv-monthly-sub').textContent = 'over ' + months.toFixed(1) + ' months';
-  document.getElementById('dv-tickers').textContent    = tickerList.length;
-
-  // Ticker breakdown table
-  var YIELD_THRESHOLD = 1.0; // only show yield if > 1%
-  document.getElementById('divBody').innerHTML = tickerList.map(function(t) {
-    var lastPay  = t.payments[t.payments.length-1];
+  // Sort by yield % (income / market value) not raw total — normalises for position size
+  var tickerList = Object.values(byTicker).map(function(t) {
+    var h = heldSet[t.ticker];
+    var mktVal   = h ? h.mktValue : 0;
+    var shares   = h ? h.shares   : 0;
+    var paymentsPerYear = (t.payments.length / Math.max(0.1, months/12));
     var avgPay   = t.total / t.payments.length;
-    // Estimate annual yield: avg payment * payments per year / current market value
-    var paymentsPerYear = t.payments.length / Math.max(0.1, months/12);
-    var annualIncome    = avgPay * paymentsPerYear;
-    var mktVal          = mktMap[t.ticker] || 0;
-    var yieldPct        = mktVal > 0 ? (annualIncome / mktVal) * 100 : null;
+    var annualIncome = avgPay * paymentsPerYear;
+    var yieldPct = mktVal > 0 ? (annualIncome / mktVal) * 100 : 0;
+    var yieldOnCost = (h && h.costBasis > 0) ? (annualIncome / h.costBasis) * 100 : 0;
+    var perShare = shares > 0 ? t.total / shares : 0;
+    t.mktVal = mktVal; t.shares = shares; t.yieldPct = yieldPct;
+    t.yieldOnCost = yieldOnCost; t.perShare = perShare; t.avgPay = avgPay;
+    t.paymentsPerYear = paymentsPerYear; t.annualIncome = annualIncome;
+    return t;
+  }).sort(function(a,b){ return b.yieldPct - a.yieldPct; }); // sort by yield %
+
+  // Best payer by yield %, not raw total
+  var bestPayer = tickerList[0];
+
+  // Stat cards
+  document.getElementById('dv-total').textContent       = hideAmounts ? '••••••' : '$' + totalDiv.toFixed(2);
+  document.getElementById('dv-count').textContent       = filteredDivs.length + ' payments across ' + tickerList.length + ' tickers';
+  document.getElementById('dv-best').textContent        = bestPayer.ticker;
+  document.getElementById('dv-best-sub').textContent    = bestPayer.yieldPct.toFixed(2) + '% yield (highest)';
+  document.getElementById('dv-monthly').textContent     = hideAmounts ? '••••••' : '$' + monthly.toFixed(2);
+  document.getElementById('dv-monthly-sub').textContent = 'over ' + months.toFixed(1) + ' months';
+  document.getElementById('dv-tickers').textContent     = tickerList.length;
+
+  // Update table header
+  var divHead = document.querySelector('#divBody')?.closest('table')?.querySelector('thead tr');
+  if (divHead) divHead.innerHTML = '<th>Ticker</th><th>Total Received</th><th>$/Share</th><th>Payments</th><th>Last Payment</th><th>Current Yield</th><th>Yield on Cost</th>';
+
+  // Ticker breakdown — sorted by yield %, showing position-aware metrics
+  var YIELD_THRESHOLD = 0.5;
+  document.getElementById('divBody').innerHTML = tickerList.map(function(t) {
+    var lastPay = t.payments[t.payments.length-1];
     return '<tr>' +
       '<td><span class="badge">' + t.ticker + '</span></td>' +
-      '<td><span class="up">$' + (hideAmounts ? '••••••' : t.total.toFixed(2)) + '</span></td>' +
+      '<td>' + (hideAmounts ? '••••••' : '<span class="up">$' + t.total.toFixed(2) + '</span>') + '</td>' +
+      '<td>' + (hideAmounts ? '••••' : (t.perShare>0 ? '$' + t.perShare.toFixed(4) : '—')) + '</td>' +
       '<td>' + t.payments.length + '</td>' +
       '<td>' + lastPay.date + '</td>' +
-      '<td>' + (hideAmounts ? '••••••' : '$' + avgPay.toFixed(2)) + '</td>' +
-      '<td>' + (yieldPct !== null && yieldPct >= YIELD_THRESHOLD
-        ? '<span class="' + (yieldPct>=3?'up':'') + '" style="font-weight:600">' + yieldPct.toFixed(2) + '%</span>'
-        : '<span style="color:var(--muted);font-size:11px">—</span>') + '</td>' +
+      '<td>' + (t.yieldPct >= YIELD_THRESHOLD
+        ? '<span class="' + (t.yieldPct>=3?'up':'') + '" style="font-weight:600">' + t.yieldPct.toFixed(2) + '%</span>'
+        : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td>' + (t.yieldOnCost >= YIELD_THRESHOLD
+        ? '<span class="' + (t.yieldOnCost>=3?'up':'') + '">' + t.yieldOnCost.toFixed(2) + '%</span>'
+        : '<span style="color:var(--muted)">—</span>') + '</td>' +
       '</tr>';
   }).join('');
 
-  // Full dividend history
-  document.getElementById('divHistBody').innerHTML = divTxns.slice().reverse().map(function(t) {
+  // Full history
+  document.getElementById('divHistBody').innerHTML = filteredDivs.slice().reverse().map(function(t) {
     return '<tr>' +
       '<td>' + t.date + '</td>' +
       '<td><span class="badge">' + (t.ticker||'—') + '</span></td>' +
@@ -1673,7 +1747,6 @@ function renderDividends() {
       '</tr>';
   }).join('');
 
-  // Draw bar chart
   drawDividendChart(tickerList);
 }
 
