@@ -145,14 +145,14 @@ canvas{max-height:250px !important}
 <div id="pane-dashboard" class="pane on">
   <div class="stat-grid">
     <div class="stat"><div class="slbl">Portfolio Value</div><div class="sval" id="sv-total">—</div><div class="ssub" id="sv-cost">Loading prices...</div></div>
-    <div class="stat"><div class="slbl">Total Gain / Loss</div><div class="sval" id="sv-gain">—</div><div class="ssub" id="sv-gainpct">vs cost basis</div></div>
+    <div class="stat"><div class="slbl">Price Gain / Loss</div><div class="sval" id="sv-gain">—</div><div class="ssub" id="sv-gainpct">market value vs cost basis</div></div>
     <div class="stat"><div class="slbl">Today's Change</div><div class="sval" id="sv-day">—</div><div class="ssub">across all positions</div></div>
     <div class="stat"><div class="slbl">Positions</div><div class="sval" id="sv-count">—</div><div class="ssub" id="sv-tickers">—</div></div>
   </div>
   <div id="contrib-stats" style="display:none">
     <div class="stat-grid" style="margin-bottom:22px">
       <div class="stat" style="--after-color:#4af0c8"><div class="slbl">Total Contributed</div><div class="sval" id="sv-contrib">—</div><div class="ssub" id="sv-contrib-sub">TFSA contributions</div></div>
-      <div class="stat"><div class="slbl">Total Return $</div><div class="sval" id="sv-tret">—</div><div class="ssub" id="sv-tret-sub">portfolio vs contributed</div></div>
+      <div class="stat"><div class="slbl">Total Return</div><div class="sval" id="sv-tret">—</div><div class="ssub" id="sv-tret-sub">incl. dividends vs contributed</div></div>
       <div class="stat"><div class="slbl">Annualized Return</div><div class="sval" id="sv-ann">—</div><div class="ssub" id="sv-ann-sub">time-weighted</div></div>
       <div class="stat"><div class="slbl">Avg Hold Time</div><div class="sval" id="sv-hold">—</div><div class="ssub">since first contribution</div></div>
     </div>
@@ -2135,7 +2135,8 @@ function renderContribs() {
   var data = enrich();
   var tv   = data.reduce(function(s,h){ return s + h.mktValue; }, 0);
   var totalContrib = contributions.reduce(function(s,c){ return s + c.amount; }, 0);
-  var totalReturn  = tv - totalContrib;
+  var totalDivs    = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; }).reduce(function(s,t){ return s+t.amount; }, 0);
+  var totalReturn  = (tv - totalContrib) + totalDivs;
   var totalRetPct  = totalContrib ? (totalReturn / totalContrib) * 100 : 0;
   var firstDate    = contributions[0].date;
   var annualized   = calcAnnualizedReturn(totalContrib, tv, firstDate);
@@ -2148,7 +2149,8 @@ function renderContribs() {
   document.getElementById('sv-tret').innerHTML = hideAmounts ? '••••••' :
     '<span class="' + (totalReturn>=0?'up':'dn') + '">' + (totalReturn>=0?'+':'-') + '$' + Math.abs(totalReturn).toFixed(2) + '</span>';
   document.getElementById('sv-tret-sub').innerHTML =
-    '<span class="' + (totalRetPct>=0?'up':'dn') + '">' + (totalRetPct>=0?'+':'') + totalRetPct.toFixed(2) + '%</span> total';
+    '<span class="' + (totalRetPct>=0?'up':'dn') + '">' + (totalRetPct>=0?'+':'') + totalRetPct.toFixed(2) + '%</span>' +
+    (totalDivs > 0 && !hideAmounts ? ' <span style="color:var(--muted);font-size:11px">incl. $' + totalDivs.toFixed(2) + ' divs</span>' : '');
   document.getElementById('sv-ann').innerHTML = annualized !== null ?
     '<span class="' + (annualized>=0?'up':'dn') + '">' + (annualized>=0?'+':'') + annualized.toFixed(2) + '%</span>' : '—';
   document.getElementById('sv-ann-sub').textContent = 'over ' + years + ' years';
