@@ -438,15 +438,6 @@ var COLORS     = ['#c8f04a','#4af0c8','#ff6b9d','#a78bfa','#ffa94d','#51cf66','#
 // ── PERSISTENCE ───────────────────────────────────────────────────────────
 function loadData() {
   try { holdings = JSON.parse(localStorage.getItem('vq_holdings') || '[]'); } catch(e) { holdings = []; }
-  if (!holdings.length) {
-    holdings = [
-      {id:1, ticker:'AAPL', shares:10,  avgCost:180},
-      {id:2, ticker:'NVDA', shares:5,   avgCost:650},
-      {id:3, ticker:'SPY',  shares:8,   avgCost:500},
-      {id:4, ticker:'VTI',  shares:15,  avgCost:240}
-    ];
-    saveData();
-  }
 }
 
 function saveData() {
@@ -1729,20 +1720,26 @@ loadData();
 loadContribs();
 loadTxns();
 loadFirebaseConfig();
-// Init Firebase and pull cloud data if connected
+// Init Firebase — always pull cloud data on page load if connected
 if (firebaseConfig) {
   var fbOk = initFirebase();
   if (fbOk) {
     fbLoad().then(function(loaded) {
       if (loaded) {
         renderAll();
-        if (contributions.length) renderContribs();
-        if (transactions.length)  renderTxns();
+        setTimeout(function(){
+          if (contributions.length) renderContribs();
+          if (transactions.length)  renderTxns();
+        }, 100);
       }
+      fetchPrices();
     });
+  } else {
+    fetchPrices();
   }
+} else {
+  fetchPrices();
 }
-fetchPrices();
 setInterval(fetchPrices, 15000);
 </script>
 </body>
