@@ -384,7 +384,7 @@ canvas + * { color: #e8eaf0 !important; }
   </div>
 
   <div class="card" style="overflow-x:auto">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px">
       <div class="ctitle" style="margin:0">All Transactions</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="sort-btn on" id="txf-all"  onclick="setTxFilter('all')">All</button>
@@ -394,8 +394,23 @@ canvas + * { color: #e8eaf0 !important; }
         <button class="sort-btn"    id="txf-CONT" onclick="setTxFilter('CONT')">Contributions</button>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--muted);font-family:var(--fm);text-transform:uppercase;letter-spacing:1px">Ticker</span>
+      <select id="txTickerSel" onchange="setTxTicker(this.value)" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--fm)">
+        <option value="all">All Tickers</option>
+      </select>
+    </div>
     <table class="tbl">
-      <thead><tr><th>Date</th><th>Type</th><th>Ticker</th><th>Shares</th><th>Price (CAD)</th><th>Amount (CAD)</th><th>Notes</th></tr></thead>
+      <thead><tr>
+        <th onclick="setTxSort('date')"   style="cursor:pointer">Date <span id="txsh-date">⇅</span></th>
+        <th onclick="setTxSort('type')"   style="cursor:pointer">Type <span id="txsh-type">⇅</span></th>
+        <th onclick="setTxSort('ticker')" style="cursor:pointer">Ticker <span id="txsh-ticker">⇅</span></th>
+        <th onclick="setTxSort('shares')" style="cursor:pointer">Shares <span id="txsh-shares">⇅</span></th>
+        <th onclick="setTxSort('price')"  style="cursor:pointer">Price <span id="txsh-price">⇅</span></th>
+        <th onclick="setTxSort('amount')" style="cursor:pointer">Amount <span id="txsh-amount">⇅</span></th>
+        <th>Notes</th>
+        <th></th>
+      </tr></thead>
       <tbody id="txnBody"></tbody>
     </table>
   </div>
@@ -748,6 +763,8 @@ async function fbLoad() {
 var contributions = [];
 var transactions  = [];   // full transaction log
 var txFilter      = 'all';
+var txSort        = { col: 'date', dir: 1 }; // col, dir: 1=asc -1=desc
+var txTickerFilter = 'all'; // filter by specific ticker
 
 function loadTxns() {
   try { transactions = JSON.parse(localStorage.getItem('vq_txns') || '[]'); } catch(e) { transactions = []; }
@@ -1539,6 +1556,37 @@ function clearTxns() {
   showToast('✅ All transactions cleared');
 }
 
+function setTxTicker(t) {
+  txTickerFilter = t;
+  renderTxnTable();
+}
+
+function setTxSort(col) {
+  if (txSort.col === col) { txSort.dir *= -1; }
+  else { txSort.col = col; txSort.dir = col === 'date' ? -1 : 1; }
+  // Update sort indicators
+  ['date','type','ticker','shares','price','amount'].forEach(function(c) {
+    var el = document.getElementById('txsh-' + c);
+    if (!el) return;
+    el.textContent = c === txSort.col ? (txSort.dir === 1 ? '↑' : '↓') : '⇅';
+    el.style.color = c === txSort.col ? 'var(--accent)' : '';
+  });
+  renderTxnTable();
+}
+
+function populateTxTickerSelect() {
+  var sel = document.getElementById('txTickerSel');
+  if (!sel) return;
+  var tickers = ['all'];
+  transactions.forEach(function(t) {
+    if (t.ticker && tickers.indexOf(t.ticker) === -1) tickers.push(t.ticker);
+  });
+  tickers.sort();
+  sel.innerHTML = tickers.map(function(t) {
+    return '<option value="' + t + '"' + (t === txTickerFilter ? ' selected' : '') + '>' + (t === 'all' ? 'All Tickers' : t) + '</option>';
+  }).join('');
+}
+
 function setTxFilter(f) {
   txFilter = f;
   document.querySelectorAll('[id^="txf-"]').forEach(function(b){ b.classList.remove('on'); });
@@ -1659,7 +1707,17 @@ function renderLotBreakdown() {
 }
 
 function renderTxnTable() {
-  var filtered = txFilter === 'all' ? transactions : transactions.filter(function(t){ return t.type === txFilter; });
+  populateTxTickerSelect();
+  var filtered = transactions.slice();
+  if (txFilter !== 'all') filtered = filtered.filter(function(t){ return t.type === txFilter; });
+  if (txTickerFilter !== 'all') filtered = filtered.filter(function(t){ return t.ticker === txTickerFilter; });
+  filtered.sort(function(a, b) {
+    var av = a[txSort.col] || '', bv = b[txSort.col] || '';
+    if (typeof av === 'number' || !isNaN(parseFloat(av))) {
+      return (parseFloat(av)||0 - parseFloat(bv)||0) * txSort.dir;
+    }
+    return av.toString().localeCompare(bv.toString()) * txSort.dir;
+  });
   var TYPE_BADGE = { BUY:'#c8f04a', SELL:'#ff5e5e', DIV:'#4af0c8', CONT:'#4af0c8', WD:'#ff5e5e', NRT:'#ff5e5e', FPLINT:'#4af0c8' };
   document.getElementById('txnBody').innerHTML = filtered.length
     ? filtered.map(function(t) {
@@ -1992,6 +2050,18 @@ function renderDividends() {
   var months     = Math.max(1, (new Date()-new Date(filteredDivs[0].date))/(1000*60*60*24*30.44));
   var monthly    = totalDiv / months;
 
+  // Build shares-held-at-time lookup for accurate $/share per payment
+  function sharesHeldAt(ticker, date) {
+    var held = 0;
+    transactions.forEach(function(t) {
+      if (t.date > date) return;
+      if (t.ticker !== ticker) return;
+      if (t.type === 'BUY')  held += t.shares;
+      if (t.type === 'SELL') held -= t.shares;
+    });
+    return Math.max(0, held);
+  }
+
   // Sort by yield % (income / market value) not raw total — normalises for position size
   var tickerList = Object.values(byTicker).map(function(t) {
     var h = heldSet[t.ticker];
@@ -2002,7 +2072,13 @@ function renderDividends() {
     var annualIncome = avgPay * paymentsPerYear;
     var yieldPct = mktVal > 0 ? (annualIncome / mktVal) * 100 : 0;
     var yieldOnCost = (h && h.costBasis > 0) ? (annualIncome / h.costBasis) * 100 : 0;
-    var perShare = shares > 0 ? t.total / shares : 0;
+    // $/share: weighted average using shares held AT TIME of each payment
+    var totalWeighted = 0, totalShares = 0;
+    t.payments.forEach(function(p) {
+      var sh = sharesHeldAt(t.ticker, p.date);
+      if (sh > 0) { totalWeighted += p.amount; totalShares += sh; }
+    });
+    var perShare = totalShares > 0 ? totalWeighted / totalShares : 0;
     t.mktVal = mktVal; t.shares = shares; t.yieldPct = yieldPct;
     t.yieldOnCost = yieldOnCost; t.perShare = perShare; t.avgPay = avgPay;
     t.paymentsPerYear = paymentsPerYear; t.annualIncome = annualIncome;
@@ -2645,7 +2721,11 @@ function renderAllocation() {
           if ((t.type==='BUY'||t.type==='SELL') && t.ticker && tradedTickers.indexOf(t.ticker) === -1)
             tradedTickers.push(t.ticker);
         });
-        tradedTickers.push('XIC.TO'); // benchmark
+        tradedTickers.push('XIC.TO');   // benchmarks
+        tradedTickers.push('XIU.TO');
+        tradedTickers.push('SPY');
+        tradedTickers.push('QQQ');
+        tradedTickers.push('XRE.TO');
 
         histPrices = {};
         var TSX  = ['XGD','RY','TD','FTS','SVR','BCE','ENB'];
@@ -2665,7 +2745,7 @@ function renderAllocation() {
             if (!res) continue;
             var tss    = res.timestamp || [];
             var cls    = res.indicators.quote[0].close || [];
-            var isCad  = isTSX || isTSXV || rawTicker === 'XIC.TO';
+            var isCad  = isTSX || isTSXV || ['XIC.TO','XIU.TO','XRE.TO'].indexOf(rawTicker) > -1;
             histPrices[rawTicker] = {};
             tss.forEach(function(ts, i) {
               if (!cls[i]) return;
@@ -2704,8 +2784,6 @@ function renderAllocation() {
       // ── Step 4b: reconstruct portfolio value at each month-end ────────
       // Replay transactions up to each month and compute holdings × hist price
       var portPcts = [];
-      var xicPcts  = [];
-      var xicBase  = null;
       var validLabels = [];
       var sourceLabels = []; // track 'real' vs 'reconstructed'
 
@@ -2764,14 +2842,6 @@ function renderAllocation() {
         }
         portPcts.push(+retPct.toFixed(2));
 
-        // XIC return from first month
-        var xicPx = histPrices['XIC.TO'] && histPrices['XIC.TO'][month];
-        if (xicPx) {
-          if (xicBase === null) xicBase = xicPx;
-          xicPcts.push(+((xicPx - xicBase) / xicBase * 100).toFixed(2));
-        } else {
-          xicPcts.push(null);
-        }
         validLabels.push(month);
       });
 
@@ -2793,18 +2863,27 @@ function renderAllocation() {
               pointBackgroundColor: portPcts.map(function(_,i){ return sourceLabels[i]==='real' ? '#c8f04a' : 'rgba(200,240,74,.4)'; }),
               pointRadius: portPcts.map(function(_,i){ return sourceLabels[i]==='real' ? 5 : 3; })
             },
-            {
-              label: 'XIC — TSX Composite',
-              data: xicPcts,
-              borderColor: '#4af0c8',
-              backgroundColor: 'rgba(74,240,200,.06)',
-              tension: 0.3, pointRadius: 4, fill: true
-            }
-          ]
+          ].concat([
+              { ticker:'XIC.TO', label:'XIC (TSX)',        color:'#4af0c8' },
+              { ticker:'XIU.TO', label:'XIU (TSX 60)',     color:'#4a8af0' },
+              { ticker:'SPY',    label:'SPY (S&P 500)',    color:'#f0c84a' },
+              { ticker:'QQQ',    label:'QQQ (Nasdaq 100)', color:'#f04a8a' },
+              { ticker:'XRE.TO', label:'XRE (CDN REIT)',   color:'#a78bfa' },
+            ].map(function(b) {
+              var base = null;
+              var bPcts = validLabels.map(function(month) {
+                var px = histPrices[b.ticker] && histPrices[b.ticker][month];
+                if (!px) return null;
+                if (base === null) base = px;
+                return +((px - base) / base * 100).toFixed(2);
+              });
+              return { label: b.label, data: bPcts, borderColor: b.color,
+                backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, fill: false, borderWidth: 1.5 };
+            }))
         },
         options: {
           plugins: {
-            legend: { labels: { color:'#e8eaf0', font:{size:12} } },
+            legend: { labels: { color:'#e8eaf0', font:{size:11}, boxWidth: 12 } },
             tooltip: { callbacks: { label: function(ctx){
               var src = ctx.datasetIndex === 0 ? (sourceLabels[ctx.dataIndex] === 'real' ? ' ✓ live' : ' ~ est.') : '';
               return ctx.dataset.label + ': ' + (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%' + src;
@@ -2812,8 +2891,7 @@ function renderAllocation() {
           },
           scales: {
             x: { grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#a0a8c0',font:{size:11}} },
-            y: { grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#a0a8c0',font:{size:11}, callback:function(v){ return (v>=0?'+':'')+v.toFixed(1)+'%'; }},
-                 plugins: { tooltip: {} } }
+            y: { grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#a0a8c0',font:{size:11}, callback:function(v){ return (v>=0?'+':'')+v.toFixed(1)+'%'; }} }
           }
         }
       });
