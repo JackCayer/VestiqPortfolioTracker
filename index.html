@@ -16,6 +16,11 @@
   --text:#e8eaf0; --muted:#5a5f7a;
   --fh:'Syne',sans-serif; --fm:'JetBrains Mono',monospace;
 }
+body.light-mode {
+  --bg:#f0f2f8; --surface:#e8eaf4; --card:#ffffff; --border:#d0d5e8;
+  --accent:#5a8a00; --accent2:#00796b; --red:#c62828; --green:#00796b;
+  --text:#1a1c2e; --muted:#7a82a8;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:var(--fh);min-height:100vh;overflow-x:hidden}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
@@ -104,6 +109,19 @@ canvas{max-height:250px !important}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .del-btn { background:transparent;border:none;color:#555;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px; }
 .del-btn:hover { color:#ff5e5e; }
+@media(max-width:700px){
+  .stat-grid{grid-template-columns:1fr 1fr!important}
+  .two-col{grid-template-columns:1fr!important}
+  .ntab{padding:7px 10px!important;font-size:11px!important}
+  .tbl th,.tbl td{padding:7px 6px!important;font-size:11px!important}
+  .form-row{grid-template-columns:1fr 1fr!important}
+  #dashBody tr td:nth-child(9){display:none}
+  .mover-grid{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:480px){
+  .stat-grid{grid-template-columns:1fr!important}
+  .ntab{padding:6px 8px!important;font-size:10px!important}
+}
 </style>
 </head>
 <body>
@@ -118,6 +136,8 @@ canvas{max-height:250px !important}
   </div>
   <div style="display:flex;align-items:center;gap:12px">
     <span id="fxRate" style="font-size:11px;color:var(--accent2);font-family:var(--fm);background:rgba(74,240,200,.07);border:1px solid rgba(74,240,200,.15);border-radius:6px;padding:3px 9px"></span>
+    <span id="tfsaRoom" style="font-size:11px;color:var(--accent);font-family:var(--fm);background:rgba(200,240,74,.07);border:1px solid rgba(200,240,74,.15);border-radius:6px;padding:3px 9px;display:none"></span>
+    <button onclick="toggleTheme()" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:13px" id="themeBtn" title="Toggle light/dark">🌙</button>
     <span id="lastUpdated" style="font-size:11px;color:var(--muted);font-family:var(--fm)"></span>
     <button id="fbIndicator" onclick="showFBModal()" title="Set up Firebase sync" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1">☁️</button>
     <button onclick="exportBackup()" title="Export all data as backup" style="background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:15px;color:var(--muted);transition:all .2s;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">💾</button>
@@ -137,6 +157,8 @@ canvas{max-height:250px !important}
   <button class="ntab"     id="tab-contrib"   onclick="showTab('contrib')">💰 Contributions</button>
   <button class="ntab"     id="tab-txn"       onclick="showTab('txn')">📋 Transactions</button>
   <button class="ntab"     id="tab-div"       onclick="showTab('div')">💵 Dividends</button>
+  <button class="ntab"     id="tab-realized"  onclick="showTab('realized')">💹 Realized</button>
+  <button class="ntab"     id="tab-alloc"     onclick="showTab('alloc')">🥧 Allocation</button>
 </nav>
 
 <main>
@@ -158,6 +180,12 @@ canvas{max-height:250px !important}
     </div>
     <div class="section-hdr" style="margin-bottom:14px">Portfolio Value vs Contributions Over Time</div>
     <div class="card" style="margin-bottom:22px"><canvas id="cContrib" style="max-height:220px !important"></canvas></div>
+  </div>
+  <div class="stat-grid" style="margin-bottom:22px">
+    <div class="stat"><div class="slbl">Realized Gains</div><div class="sval" id="sv-realized">—</div><div class="ssub">from closed trades</div></div>
+    <div class="stat"><div class="slbl">Proj. Annual Divs</div><div class="sval" id="sv-projdiv">—</div><div class="ssub" id="sv-projdiv-sub">est. income this year</div></div>
+    <div class="stat"><div class="slbl">TFSA Room Left</div><div class="sval" id="sv-tfsaroom">—</div><div class="ssub">2026 limit $7,000</div></div>
+    <div class="stat"><div class="slbl">Unrealized Gain</div><div class="sval" id="sv-unrealized">—</div><div class="ssub" id="sv-unrealized-sub">open positions only</div></div>
   </div>
   <div class="section-hdr">Top Movers Today</div>
   <div class="mover-grid" id="moversGrid"></div>
@@ -184,6 +212,7 @@ canvas{max-height:250px !important}
         <th onclick="setSort('gain')"      style="cursor:pointer" id="th-gain">Gain $ ⇅</th>
         <th onclick="setSort('gainPct')"   style="cursor:pointer" id="th-gainPct">Gain % ⇅</th>
         <th onclick="setSort('dayChange')" style="cursor:pointer" id="th-dayChange">Day $ ⇅</th>
+        <th>Notes</th>
       </tr></thead>
       <tbody id="dashBody"></tbody>
     </table>
@@ -246,6 +275,7 @@ canvas{max-height:250px !important}
   <div class="card">
     <div class="ctitle">⚠️ Reset</div>
     <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:14px">Clears all holdings stored in this browser. Use before importing a fresh dataset.</p>
+    <button class="btn btn-b" onclick="exportHoldingsCSV()" style="margin-bottom:10px;width:100%">📥 Export Holdings CSV</button>
     <button class="btn-del" onclick="clearAll()">Clear All Holdings</button>
   </div>
 </div>
@@ -405,10 +435,47 @@ canvas{max-height:250px !important}
   </div>
 
   <div class="card" style="margin-top:0px;overflow-x:auto">
+    <div class="ctitle" style="margin-bottom:14px">📅 Dividend Calendar</div>
+    <div id="divCalendar" style="overflow-x:auto;margin-bottom:22px"></div>
+  </div>
+  <div class="card" style="margin-top:0px;overflow-x:auto">
     <div class="ctitle">All Dividend Payments</div>
     <table class="tbl">
       <thead><tr><th>Date</th><th>Ticker</th><th>Amount</th><th>Notes</th></tr></thead>
       <tbody id="divHistBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════ REALIZED GAINS ══════════════ -->
+<div id="pane-realized" class="pane">
+  <div class="stat-grid" style="margin-bottom:22px">
+    <div class="stat"><div class="slbl">Total Realized</div><div class="sval" id="rz-total">—</div><div class="ssub" id="rz-sub">from closed positions</div></div>
+    <div class="stat"><div class="slbl">Best Trade</div><div class="sval" id="rz-best">—</div><div class="ssub" id="rz-best-sub">—</div></div>
+    <div class="stat"><div class="slbl">Worst Trade</div><div class="sval" id="rz-worst">—</div><div class="ssub" id="rz-worst-sub">—</div></div>
+    <div class="stat"><div class="slbl">Win Rate</div><div class="sval" id="rz-winrate">—</div><div class="ssub" id="rz-winrate-sub">profitable closes</div></div>
+  </div>
+  <div class="card" style="overflow-x:auto">
+    <div class="ctitle">Closed Positions</div>
+    <table class="tbl">
+      <thead><tr><th>Ticker</th><th>Shares Sold</th><th>Avg Cost</th><th>Sell Price</th><th>Gain $</th><th>Gain %</th><th>Date</th></tr></thead>
+      <tbody id="rzBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════════ ALLOCATION ══════════════ -->
+<div id="pane-alloc" class="pane">
+  <div class="two-col" style="margin-bottom:22px">
+    <div class="card"><div class="ctitle">By Position</div><canvas id="cAlloc" style="max-height:300px"></canvas></div>
+    <div class="card"><div class="ctitle">By Currency</div><canvas id="cCurrency" style="max-height:300px"></canvas></div>
+  </div>
+  <div class="card" style="margin-bottom:22px"><div class="ctitle">Benchmark vs Portfolio</div><canvas id="cBench" style="max-height:220px"></canvas></div>
+  <div class="card">
+    <div class="ctitle">Position Breakdown</div>
+    <table class="tbl">
+      <thead><tr><th>Ticker</th><th>Value</th><th>Weight %</th><th>Currency</th><th>Notes</th></tr></thead>
+      <tbody id="allocBody"></tbody>
     </table>
   </div>
 </div>
@@ -544,6 +611,8 @@ function showTab(name) {
   if (name === 'contrib') { renderContribs(); setTimeout(function(){ if(contributions.length) drawContribChart(enrich().reduce(function(s,h){return s+h.mktValue;},0), contributions.reduce(function(s,c){return s+c.amount;},0)); }, 100); }
   if (name === 'txn') { renderTxns(); updateTxnForm(); }
   if (name === 'div') { renderDividends(); setTimeout(function(){ if(transactions.length) drawDividendChart(Object.values((function(){var b={};transactions.filter(function(t){return t.type==='DIV'||t.type==='FPLINT';}).forEach(function(t){var k=t.ticker||'OTHER';if(!b[k])b[k]={total:0,ticker:k};b[k].total+=t.amount;});return b;})()).sort(function(a,b){return b.total-a.total;})); }, 100); }
+  if (name === 'realized') { renderRealized(); }
+  if (name === 'alloc') { setTimeout(function(){ renderAllocation(); }, 100); }
 }
 
 // ── PRICE FETCHING ────────────────────────────────────────────────────────
@@ -716,8 +785,8 @@ async function fetchPrices() {
     var yahooTicker = isTSXV ? t + '.V' : isTSX ? t + '.TO' : t;
     try {
       var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + yahooTicker + '?interval=1d&range=1d';
-      var raw2  = await fetchViaProxy(yahooUrl);
-      if (!raw2) throw new Error('proxy failed');
+      var raw2  = await fetchWithRetry(yahooUrl, 2);
+      if (!raw2) throw new Error('proxy failed after retries');
       var data  = JSON.parse(raw2);
       var meta  = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
       if (meta) {
@@ -1006,6 +1075,7 @@ function renderAll() {
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain)) + '</td>' +
           '<td>' + cpd(h.gainPct) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.changePct||0) : cd(h.dayChange)) + '</td>' +
+          '<td style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (h.notes||'') + '</td>' +
           '</tr>';
       }).join('')
     : '<tr><td colspan="8" class="empty">No holdings yet — add some in Holdings or Import</td></tr>';
@@ -1422,6 +1492,9 @@ function importTxnCSV() {
   var el    = document.getElementById('txnCsvStatus');
   var parsed = parseTxnCSVText(text);
   if (parsed.length > 0) {
+    var existing = transactions.length;
+    var dupes = existing > 0 ? findDuplicates(parsed) : [];
+    if (dupes.length && !confirm('Found ' + dupes.length + ' possible duplicate(s):\n' + dupes.slice(0,5).join('\n') + (dupes.length>5?'\n...and '+(dupes.length-5)+' more':'') + '\n\nImport anyway (will replace all transactions)?')) return;
     transactions = parsed;
     saveTxns();
     rebuildHoldingsFromTxns();
@@ -1578,10 +1651,10 @@ function renderTxnTable() {
           '<td>' + (t.price ? '$' + t.price.toFixed(2) : '—') + '</td>' +
           '<td>' + (hideAmounts ? '••••••' : (t.amount ? (t.amount < 0 ? '-$'+Math.abs(t.amount).toFixed(2) : '$'+t.amount.toFixed(2)) : '—')) + '</td>' +
           '<td style="color:var(--muted);font-size:11px">' + (t.notes || '') + '</td>' +
-          '<td><button class="del-btn" onclick="deleteTxn(' + tid + ')">✕</button></td>' +
+          '<td style="white-space:nowrap"><button class="del-btn" style="color:var(--muted);margin-right:4px" onclick="editTxn(' + tid + ')" title="Edit">✏️</button><button class="del-btn" onclick="deleteTxn(' + tid + ')">✕</button></td>' +
           '</tr>';
       }).join('')
-    : '<tr><td colspan="8" class="empty">No transactions' + (txFilter !== 'all' ? ' of type ' + txFilter : '') + '</td></tr>';
+    : '<tr><td colspan="9" class="empty">No transactions' + (txFilter !== 'all' ? ' of type ' + txFilter : '') + '</td></tr>';
 }
 
 function deleteTxn(id) {
@@ -1960,6 +2033,7 @@ function renderDividends() {
 
   drawDividendChart(tickerList);
   drawDivMonthlyChart(filteredDivs);
+  renderDivCalendar();
 }
 
 function drawDivMonthlyChart(divTxns) {
@@ -2279,6 +2353,359 @@ if (firebaseConfig) {
   fetchPrices();
 }
 setInterval(fetchPrices, 15000);
+
+// ══════════════════════════════════════════════════════════════
+// THEME TOGGLE
+// ══════════════════════════════════════════════════════════════
+function toggleTheme() {
+  var light = document.body.classList.toggle('light-mode');
+  localStorage.setItem('vq_theme', light ? 'light' : 'dark');
+  document.getElementById('themeBtn').textContent = light ? '🌞' : '🌙';
+}
+(function(){
+  if (localStorage.getItem('vq_theme') === 'light') {
+    document.body.classList.add('light-mode');
+    var btn = document.getElementById('themeBtn');
+    if (btn) btn.textContent = '🌞';
+  }
+})();
+
+// ══════════════════════════════════════════════════════════════
+// TFSA ROOM
+// ══════════════════════════════════════════════════════════════
+function updateTFSARoom() {
+  var LIMIT_2026 = 7000;
+  var contrib2026 = contributions.filter(function(c){ return c.date >= '2026-01-01' && c.amount > 0; })
+    .reduce(function(s,c){ return s + c.amount; }, 0);
+  var room = LIMIT_2026 - contrib2026;
+  var el = document.getElementById('sv-tfsaroom');
+  var hdr = document.getElementById('tfsaRoom');
+  if (el) {
+    el.textContent = hideAmounts ? '••••••' : '$' + room.toFixed(2);
+    el.className = room < 500 ? 'dn' : 'up';
+  }
+  if (hdr) {
+    hdr.style.display = '';
+    hdr.textContent = 'TFSA room: $' + room.toFixed(2);
+    hdr.style.color = room < 500 ? 'var(--red)' : 'var(--accent2)';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// REALIZED GAINS
+// ══════════════════════════════════════════════════════════════
+function calcRealizedGains() {
+  var lots = {};
+  var realized = [];
+
+  transactions.forEach(function(t) {
+    if (t.type === 'BUY' && t.ticker && t.shares > 0) {
+      if (!lots[t.ticker]) lots[t.ticker] = [];
+      var costPerShare = t.price > 0 ? t.price : (t.shares > 0 ? t.amount / t.shares : 0);
+      lots[t.ticker].push({ shares: t.shares, costPerShare: costPerShare, totalCost: t.amount, date: t.date });
+    } else if (t.type === 'SELL' && t.ticker && t.shares > 0) {
+      if (!lots[t.ticker]) return;
+      var toSell = t.shares;
+      var costOfSold = 0;
+      lots[t.ticker] = lots[t.ticker].reduce(function(acc, lot) {
+        if (toSell <= 0) { acc.push(lot); return acc; }
+        if (lot.shares <= toSell) {
+          costOfSold += lot.totalCost;
+          toSell -= lot.shares;
+        } else {
+          var pct = toSell / lot.shares;
+          costOfSold += lot.totalCost * pct;
+          acc.push({ shares: lot.shares - toSell, costPerShare: lot.costPerShare, totalCost: lot.totalCost * (1-pct), date: lot.date });
+          toSell = 0;
+        }
+        return acc;
+      }, []);
+      var gain = t.amount - costOfSold;
+      var gainPct = costOfSold > 0 ? (gain / costOfSold) * 100 : 0;
+      realized.push({ ticker: t.ticker, shares: t.shares, proceeds: t.amount, cost: costOfSold, gain: gain, gainPct: gainPct, date: t.date, sellPrice: t.price || (t.amount/t.shares) });
+    }
+  });
+  return realized;
+}
+
+function renderRealized() {
+  var realized = calcRealizedGains();
+  var totalGain = realized.reduce(function(s,r){ return s + r.gain; }, 0);
+  var wins = realized.filter(function(r){ return r.gain >= 0; });
+  var losses = realized.filter(function(r){ return r.gain < 0; });
+  var best = realized.length ? realized.slice().sort(function(a,b){ return b.gain-a.gain; })[0] : null;
+  var worst = realized.length ? realized.slice().sort(function(a,b){ return a.gain-b.gain; })[0] : null;
+
+  document.getElementById('rz-total').innerHTML = realized.length
+    ? '<span class="' + (totalGain>=0?'up':'dn') + '">' + (totalGain>=0?'+':'-') + '$' + Math.abs(totalGain).toFixed(2) + '</span>' : '—';
+  document.getElementById('rz-sub').textContent = realized.length + ' closed position' + (realized.length!==1?'s':'');
+  document.getElementById('rz-best').innerHTML = best ? '<span class="up">+$' + best.gain.toFixed(2) + '</span>' : '—';
+  document.getElementById('rz-best-sub').textContent = best ? best.ticker + ' (' + best.date + ')' : '';
+  document.getElementById('rz-worst').innerHTML = worst ? '<span class="' + (worst.gain>=0?'up':'dn') + '">' + (worst.gain>=0?'+':'-') + '$' + Math.abs(worst.gain).toFixed(2) + '</span>' : '—';
+  document.getElementById('rz-worst-sub').textContent = worst ? worst.ticker + ' (' + worst.date + ')' : '';
+  document.getElementById('rz-winrate').textContent = realized.length ? Math.round(wins.length/realized.length*100) + '%' : '—';
+  document.getElementById('rz-winrate-sub').textContent = wins.length + ' wins / ' + losses.length + ' losses';
+
+  // Also update dashboard stat
+  var el = document.getElementById('sv-realized');
+  if (el) el.innerHTML = '<span class="' + (totalGain>=0?'up':'dn') + '">' + (totalGain>=0?'+':'-') + '$' + Math.abs(totalGain).toFixed(2) + '</span>';
+
+  document.getElementById('rzBody').innerHTML = realized.length
+    ? realized.slice().reverse().map(function(r) {
+        var avgCost = r.cost / r.shares;
+        return '<tr>' +
+          '<td><span class="badge">' + r.ticker + '</span></td>' +
+          '<td>' + r.shares.toFixed(4) + '</td>' +
+          '<td>$' + avgCost.toFixed(2) + ' CAD</td>' +
+          '<td>$' + r.sellPrice.toFixed(2) + ' CAD</td>' +
+          '<td><span class="' + (r.gain>=0?'up':'dn') + '">' + (r.gain>=0?'+':'-') + '$' + Math.abs(r.gain).toFixed(2) + '</span></td>' +
+          '<td><span class="' + (r.gainPct>=0?'up':'dn') + '">' + (r.gainPct>=0?'+':'') + r.gainPct.toFixed(2) + '%</span></td>' +
+          '<td style="color:var(--muted);font-size:11px">' + r.date + '</td>' +
+          '</tr>';
+      }).join('')
+    : '<tr><td colspan="7" class="empty">No closed positions yet</td></tr>';
+}
+
+// ══════════════════════════════════════════════════════════════
+// ALLOCATION + BENCHMARK
+// ══════════════════════════════════════════════════════════════
+function renderAllocation() {
+  var data = enrich();
+  if (!data.length) return;
+  var tv = data.reduce(function(s,h){ return s+h.mktValue; }, 0);
+
+  // Position allocation pie
+  var sorted = data.slice().sort(function(a,b){ return b.mktValue-a.mktValue; });
+  var labels = sorted.map(function(h){ return h.ticker; });
+  var values = sorted.map(function(h){ return h.mktValue; });
+  var colors = ['#c8f04a','#4af0c8','#f04a8a','#4a8af0','#f0c84a','#8af04a','#c84af0','#4af04a','#f08a4a','#4ac8f0','#f04a4a','#a8f04a','#4af0a8','#f0a84a','#4a4af0'];
+
+  if (myCharts['cAlloc']) myCharts['cAlloc'].destroy();
+  var el = document.getElementById('cAlloc');
+  if (el) myCharts['cAlloc'] = new Chart(el, {
+    type: 'doughnut',
+    data: { labels: labels, datasets: [{ data: values, backgroundColor: colors.slice(0,labels.length), borderWidth: 2, borderColor: 'var(--bg)' }] },
+    options: { plugins: { legend: { position:'right', labels:{ color:'var(--text)', font:{size:11} } } }, cutout:'60%' }
+  });
+
+  // Currency split
+  var cadVal = data.filter(function(h){ return h.currency==='CAD'; }).reduce(function(s,h){ return s+h.mktValue; },0);
+  var usdVal = data.filter(function(h){ return h.currency!=='CAD'; }).reduce(function(s,h){ return s+h.mktValue; },0);
+  if (myCharts['cCurrency']) myCharts['cCurrency'].destroy();
+  var el2 = document.getElementById('cCurrency');
+  if (el2) myCharts['cCurrency'] = new Chart(el2, {
+    type: 'doughnut',
+    data: { labels: ['CAD','USD→CAD'], datasets: [{ data: [cadVal, usdVal], backgroundColor: ['#4af0c8','#c8f04a'], borderWidth:2, borderColor:'var(--bg)' }] },
+    options: { plugins: { legend: { position:'right', labels:{ color:'var(--text)', font:{size:12} } } }, cutout:'60%' }
+  });
+
+  // Allocation table
+  document.getElementById('allocBody').innerHTML = sorted.map(function(h) {
+    var weight = tv > 0 ? (h.mktValue/tv*100) : 0;
+    return '<tr>' +
+      '<td><span class="badge">' + h.ticker + '</span></td>' +
+      '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
+      '<td><div style="display:flex;align-items:center;gap:8px"><span>' + weight.toFixed(1) + '%</span><div style="width:80px;height:6px;background:var(--border);border-radius:3px"><div style="width:' + Math.min(100,weight) + '%;height:100%;background:var(--accent);border-radius:3px"></div></div></div></td>' +
+      '<td><span style="font-size:10px;color:' + (h.currency==='USD→CAD'?'var(--accent2)':'var(--muted)') + '">' + (h.currency||'CAD') + '</span></td>' +
+      '<td style="font-size:11px;color:var(--muted)">' + (h.notes||'—') + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// PROJECTED ANNUAL DIVIDENDS
+// ══════════════════════════════════════════════════════════════
+function calcProjAnnualDivs() {
+  var divTxns = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; });
+  if (!divTxns.length) return 0;
+  var byTicker = {};
+  divTxns.forEach(function(t) {
+    var k = t.ticker||'OTHER';
+    if (!byTicker[k]) byTicker[k] = { total:0, count:0, first:t.date, last:t.date };
+    byTicker[k].total += t.amount;
+    byTicker[k].count++;
+    if (t.date > byTicker[k].last) byTicker[k].last = t.date;
+  });
+  var months = Math.max(1, (new Date() - new Date(divTxns[0].date)) / (1000*60*60*24*30.44));
+  var monthly = divTxns.reduce(function(s,t){ return s+t.amount; },0) / months;
+  return monthly * 12;
+}
+
+// ══════════════════════════════════════════════════════════════
+// DIVIDEND CALENDAR
+// ══════════════════════════════════════════════════════════════
+function renderDivCalendar() {
+  var divTxns = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; });
+  var byTickerMonth = {};
+  divTxns.forEach(function(t) {
+    var month = parseInt(t.date.substr(5,2));
+    var k = t.ticker||'OTHER';
+    if (!byTickerMonth[k]) byTickerMonth[k] = {};
+    if (!byTickerMonth[k][month]) byTickerMonth[k][month] = 0;
+    byTickerMonth[k][month] += t.amount;
+  });
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var tickers = Object.keys(byTickerMonth).sort();
+  if (!tickers.length) return;
+  var calEl = document.getElementById('divCalendar');
+  if (!calEl) return;
+  var html = '<table class="tbl"><thead><tr><th>Ticker</th>' + months.map(function(m){ return '<th>' + m + '</th>'; }).join('') + '</tr></thead><tbody>';
+  tickers.forEach(function(ticker) {
+    html += '<tr><td><span class="badge">' + ticker + '</span></td>';
+    for (var m = 1; m <= 12; m++) {
+      var amt = byTickerMonth[ticker][m] || 0;
+      html += '<td>' + (amt > 0 ? '<span class="up" style="font-size:11px">$' + amt.toFixed(2) + '</span>' : '<span style="color:var(--border)">·</span>') + '</td>';
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  calEl.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// EDIT TRANSACTION MODAL
+// ══════════════════════════════════════════════════════════════
+function editTxn(id) {
+  var t = transactions.find(function(x){ return x.id === id; });
+  if (!t) return;
+  var modal = document.getElementById('editTxnModal');
+  if (!modal) return;
+  document.getElementById('et-date').value   = t.date || '';
+  document.getElementById('et-type').value   = t.type || 'BUY';
+  document.getElementById('et-ticker').value = t.ticker || '';
+  document.getElementById('et-shares').value = t.shares || '';
+  document.getElementById('et-price').value  = t.price  || '';
+  document.getElementById('et-amount').value = t.amount || '';
+  document.getElementById('et-notes').value  = t.notes  || '';
+  document.getElementById('et-id').value     = id;
+  modal.style.display = 'flex';
+}
+
+function saveEditTxn() {
+  var id     = parseFloat(document.getElementById('et-id').value);
+  var t      = transactions.find(function(x){ return x.id === id; });
+  if (!t) return;
+  t.date   = document.getElementById('et-date').value;
+  t.type   = document.getElementById('et-type').value;
+  t.ticker = document.getElementById('et-ticker').value.toUpperCase();
+  t.shares = parseFloat(document.getElementById('et-shares').value) || 0;
+  t.price  = parseFloat(document.getElementById('et-price').value)  || 0;
+  t.amount = parseFloat(document.getElementById('et-amount').value) || 0;
+  t.notes  = document.getElementById('et-notes').value;
+  transactions.sort(function(a,b){ return new Date(a.date)-new Date(b.date); });
+  saveTxns();
+  rebuildHoldingsFromTxns();
+  renderAll(); renderTxns(); renderDividends();
+  closeEditModal();
+  showToast('✅ Transaction updated');
+}
+
+function closeEditModal() {
+  var modal = document.getElementById('editTxnModal');
+  if (modal) modal.style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+// DUPLICATE DETECTION ON IMPORT
+// ══════════════════════════════════════════════════════════════
+function findDuplicates(parsed) {
+  var dupes = [];
+  parsed.forEach(function(t) {
+    var exists = transactions.some(function(e) {
+      return e.date === t.date && e.type === t.type && e.ticker === t.ticker && Math.abs(e.amount - t.amount) < 0.01;
+    });
+    if (exists) dupes.push(t.date + ' ' + t.type + ' ' + t.ticker + ' $' + t.amount);
+  });
+  return dupes;
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXPORT HOLDINGS CSV
+// ══════════════════════════════════════════════════════════════
+function exportHoldingsCSV() {
+  var data = enrich();
+  var rows = ['Ticker,Shares,Avg Cost CAD,Current Price CAD,Market Value CAD,Gain $,Gain %,Currency,Notes'];
+  data.forEach(function(h) {
+    rows.push([h.ticker, h.shares, h.avgCostCAD.toFixed(2), h.price ? h.price.toFixed(2) : '', h.mktValue.toFixed(2), h.gain.toFixed(2), h.gainPct.toFixed(2)+'%', h.currency||'CAD', (h.notes||'').replace(/,/g,' ')].join(','));
+  });
+  var blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'vestiq-holdings-' + new Date().toISOString().substr(0,10) + '.csv';
+  a.click();
+  showToast('✅ Holdings exported');
+}
+
+// ══════════════════════════════════════════════════════════════
+// PRICE RETRY ON FAILURE
+// ══════════════════════════════════════════════════════════════
+async function fetchWithRetry(url, retries) {
+  for (var i = 0; i <= (retries||2); i++) {
+    try {
+      var result = await fetchViaProxy(url);
+      if (result) return result;
+    } catch(e) {
+      if (i === (retries||2)) throw e;
+      await new Promise(function(r){ setTimeout(r, 500 * (i+1)); });
+    }
+  }
+  return null;
+}
+
+// Hook into renderAll to update all new stats
+var _origRenderAll = renderAll;
+renderAll = function() {
+  _origRenderAll.apply(this, arguments);
+  var realizedGains = calcRealizedGains();
+  var totalRealized = realizedGains.reduce(function(s,r){ return s+r.gain; }, 0);
+  var el = document.getElementById('sv-realized');
+  if (el) el.innerHTML = '<span class="' + (totalRealized>=0?'up':'dn') + '">' + (totalRealized>=0?'+':'-') + '$' + Math.abs(totalRealized).toFixed(2) + '</span>';
+
+  var projDiv = calcProjAnnualDivs();
+  var pd = document.getElementById('sv-projdiv');
+  if (pd) pd.textContent = hideAmounts ? '••••••' : '$' + projDiv.toFixed(2);
+  var pds = document.getElementById('sv-projdiv-sub');
+  if (pds) pds.textContent = '$' + (projDiv/12).toFixed(2) + '/month est.';
+
+  updateTFSARoom();
+
+  // Unrealized = price gain on open positions
+  var data = enrich();
+  var unrealized = data.reduce(function(s,h){ return s+h.gain; }, 0);
+  var uEl = document.getElementById('sv-unrealized');
+  if (uEl) uEl.innerHTML = '<span class="' + (unrealized>=0?'up':'dn') + '">' + (unrealized>=0?'+':'-') + '$' + Math.abs(unrealized).toFixed(2) + '</span>';
+  var uSub = document.getElementById('sv-unrealized-sub');
+  if (uSub) uSub.textContent = (unrealized>=0?'+':'-') + Math.abs(unrealized / Math.max(1, data.reduce(function(s,h){return s+h.costBasis;},0)) * 100).toFixed(2) + '% open positions';
+};
+
+setInterval(fetchPrices, 15000);
 </script>
+<!-- Edit Transaction Modal -->
+<div id="editTxnModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px;width:min(500px,95vw);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div class="ctitle" style="margin:0">✏️ Edit Transaction</div>
+      <button onclick="closeEditModal()" style="background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:20px">✕</button>
+    </div>
+    <input type="hidden" id="et-id"/>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div><div class="flbl">Date</div><input id="et-date" class="ifield" type="date"/></div>
+      <div><div class="flbl">Type</div>
+        <select id="et-type" class="ifield" style="padding:8px">
+          <option>BUY</option><option>SELL</option><option>DIV</option><option>CONT</option><option>WD</option><option>NRT</option>
+        </select>
+      </div>
+      <div><div class="flbl">Ticker</div><input id="et-ticker" class="ifield" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div><div class="flbl">Shares</div><input id="et-shares" class="ifield" type="number" step="0.0001"/></div>
+      <div><div class="flbl">Price (CAD)</div><input id="et-price" class="ifield" type="number" step="0.01"/></div>
+      <div><div class="flbl">Amount (CAD)</div><input id="et-amount" class="ifield" type="number" step="0.01"/></div>
+    </div>
+    <div style="margin-bottom:16px"><div class="flbl">Notes</div><input id="et-notes" class="ifield" style="width:100%"/></div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-a" onclick="saveEditTxn()" style="flex:1">Save Changes</button>
+      <button class="btn btn-b" onclick="closeEditModal()" style="flex:1">Cancel</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
