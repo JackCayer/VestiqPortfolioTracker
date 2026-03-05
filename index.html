@@ -554,6 +554,154 @@ canvas + * { color: #e8eaf0 !important; }
     <div id="srch-owned" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px"></div>
   </div>
 
+  <!-- Screener -->
+  <div class="card" style="margin-bottom:22px">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div class="ctitle" style="margin:0">Screen Stocks</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="sort-btn on" id="scr-preset-divgrowth" onclick="applyScreenerPreset('divgrowth')">Dividend Growth</button>
+        <button class="sort-btn" id="scr-preset-value"      onclick="applyScreenerPreset('value')">Value</button>
+        <button class="sort-btn" id="scr-preset-momentum"   onclick="applyScreenerPreset('momentum')">Momentum</button>
+        <button class="sort-btn" id="scr-preset-tsxblue"    onclick="applyScreenerPreset('tsxblue')">TSX Blue Chip</button>
+        <button class="sort-btn" id="scr-preset-growth"     onclick="applyScreenerPreset('growth')">Growth</button>
+        <button class="sort-btn" id="scr-preset-clear"      onclick="applyScreenerPreset('clear')">Clear</button>
+      </div>
+    </div>
+
+    <!-- Filter grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px">
+
+      <!-- Exchange -->
+      <div>
+        <div class="flbl">Exchange</div>
+        <select id="scr-exchange" class="ifield" style="font-size:12px">
+          <option value="">Any</option>
+          <option value="tsx">TSX (Canada)</option>
+          <option value="nyse">NYSE (US)</option>
+          <option value="nasdaq">NASDAQ (US)</option>
+        </select>
+      </div>
+
+      <!-- Sector -->
+      <div>
+        <div class="flbl">Sector</div>
+        <select id="scr-sector" class="ifield" style="font-size:12px">
+          <option value="">Any</option>
+          <option value="Technology">Technology</option>
+          <option value="Financial Services">Financial Services</option>
+          <option value="Energy">Energy</option>
+          <option value="Healthcare">Healthcare</option>
+          <option value="Industrials">Industrials</option>
+          <option value="Consumer Defensive">Consumer Defensive</option>
+          <option value="Consumer Cyclical">Consumer Cyclical</option>
+          <option value="Utilities">Utilities</option>
+          <option value="Real Estate">Real Estate</option>
+          <option value="Basic Materials">Basic Materials</option>
+          <option value="Communication Services">Communication Services</option>
+        </select>
+      </div>
+
+      <!-- Market Cap -->
+      <div>
+        <div class="flbl">Market Cap</div>
+        <select id="scr-mktcap" class="ifield" style="font-size:12px">
+          <option value="">Any</option>
+          <option value="mega">Mega (>$200B)</option>
+          <option value="large">Large ($10B–$200B)</option>
+          <option value="mid">Mid ($2B–$10B)</option>
+          <option value="small">Small ($300M–$2B)</option>
+          <option value="micro">Micro (<$300M)</option>
+        </select>
+      </div>
+
+      <!-- P/E Ratio -->
+      <div>
+        <div class="flbl">P/E Ratio</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="scr-pe-min" class="ifield" type="number" placeholder="Min" style="font-size:12px;width:70px"/>
+          <span style="color:var(--muted);font-size:12px">–</span>
+          <input id="scr-pe-max" class="ifield" type="number" placeholder="Max" style="font-size:12px;width:70px"/>
+        </div>
+      </div>
+
+      <!-- Dividend Yield -->
+      <div>
+        <div class="flbl">Dividend Yield %</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="scr-yield-min" class="ifield" type="number" placeholder="Min" step="0.1" style="font-size:12px;width:70px"/>
+          <span style="color:var(--muted);font-size:12px">–</span>
+          <input id="scr-yield-max" class="ifield" type="number" placeholder="Max" step="0.1" style="font-size:12px;width:70px"/>
+        </div>
+      </div>
+
+      <!-- Price -->
+      <div>
+        <div class="flbl">Price (local currency)</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="scr-price-min" class="ifield" type="number" placeholder="Min $" style="font-size:12px;width:70px"/>
+          <span style="color:var(--muted);font-size:12px">–</span>
+          <input id="scr-price-max" class="ifield" type="number" placeholder="Max $" style="font-size:12px;width:70px"/>
+        </div>
+      </div>
+
+      <!-- 52W Performance -->
+      <div>
+        <div class="flbl">52W Return %</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="scr-ret-min" class="ifield" type="number" placeholder="Min %" style="font-size:12px;width:70px"/>
+          <span style="color:var(--muted);font-size:12px">–</span>
+          <input id="scr-ret-max" class="ifield" type="number" placeholder="Max %" style="font-size:12px;width:70px"/>
+        </div>
+      </div>
+
+      <!-- Beta -->
+      <div>
+        <div class="flbl">Beta</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input id="scr-beta-min" class="ifield" type="number" placeholder="Min" step="0.1" style="font-size:12px;width:70px"/>
+          <span style="color:var(--muted);font-size:12px">–</span>
+          <input id="scr-beta-max" class="ifield" type="number" placeholder="Max" step="0.1" style="font-size:12px;width:70px"/>
+        </div>
+      </div>
+
+      <!-- Sort by -->
+      <div>
+        <div class="flbl">Sort By</div>
+        <select id="scr-sortby" class="ifield" style="font-size:12px">
+          <option value="marketCap">Market Cap</option>
+          <option value="trailingPE">P/E Ratio</option>
+          <option value="dividendYield">Dividend Yield</option>
+          <option value="52wReturn">52W Return</option>
+          <option value="price">Price</option>
+          <option value="beta">Beta</option>
+        </select>
+      </div>
+
+      <!-- Sort dir -->
+      <div>
+        <div class="flbl">Order</div>
+        <select id="scr-sortdir" class="ifield" style="font-size:12px">
+          <option value="desc">High → Low</option>
+          <option value="asc">Low → High</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-a" onclick="runScreener()" style="padding:10px 28px">Run Screen</button>
+      <div id="scr-status" style="font-size:12px;color:var(--muted);font-family:var(--fm)"></div>
+    </div>
+
+    <!-- Results table -->
+    <div id="scr-results" style="display:none;margin-top:16px;overflow-x:auto">
+      <table class="tbl" style="font-size:12px">
+        <thead><tr id="scr-thead"></tr></thead>
+        <tbody id="scr-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Results — hidden until search -->
   <div id="srch-results" style="display:none">
 
@@ -2661,6 +2809,223 @@ async function loadSnapshots() {
     if (!snapDoc.exists) return {};
     return JSON.parse(snapDoc.data().daily || '{}');
   } catch(e) { return {}; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// STOCK SCREENER
+// ══════════════════════════════════════════════════════════════
+
+// Curated ticker universe by exchange
+var SCREENER_UNIVERSE = {
+  tsx: ['RY','TD','BNS','BMO','CM','NA','MFC','SLF','GWO','POW','IGM','IFC',
+        'ENB','TRP','PPL','CNQ','SU','CVE','IMO','BTE','CPX','AQN','FTS','EMA','H',
+        'CNR','CP','ATD','L','WN','MRU','DOL','EMP','CTC','CCL','CTC',
+        'BAM','BIP','BEP','BBD','ABX','AEM','WPM','FM','TECK','CCO','NTR',
+        'SHOP','CSU','KXS','DSGX','TOI','MG','CAE','TRI','WFG','IFP'],
+  nyse: ['JPM','BAC','WFC','GS','MS','BLK','C','USB','PNC','TFC',
+         'XOM','CVX','COP','SLB','EOG','PXD','MPC','VLO','PSX',
+         'JNJ','PFE','UNH','ABT','MRK','BMY','LLY','ABBV','TMO','DHR',
+         'GE','CAT','DE','BA','HON','MMM','RTX','LMT','NOC','GD',
+         'WMT','HD','PG','KO','PEP','MCD','NKE','COST','TGT','LOW',
+         'NEE','DUK','SO','D','AEP','SRE','XEL','ED','ES','ETR',
+         'AMT','PLD','CCI','EQIX','SPG','PSA','O','DLR','WELL','VTR'],
+  nasdaq: ['AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','ASML','ADBE',
+           'CSCO','INTC','AMD','QCOM','TXN','MU','AMAT','LRCX','KLAC','MRVL',
+           'NFLX','AMGN','GILD','BIIB','REGN','VRTX','MRNA','ILMN','IDXX','EW',
+           'COST','SBUX','MDLZ','MNST','KHC','CDNS','SNPS','ANSS','PTC','TEAM',
+           'PYPL','INTU','ADSK','PAYX','FISV','CTSH','AMAT','MCHP','MPWR','SWKS']
+};
+
+var SECTOR_MAP = {
+  'Financial Services': ['RY','TD','BNS','BMO','CM','NA','MFC','SLF','GWO','POW','IGM','IFC','JPM','BAC','WFC','GS','MS','BLK','C','USB'],
+  'Energy':             ['ENB','TRP','PPL','CNQ','SU','CVE','XOM','CVX','COP','SLB','EOG','PXD','MPC','VLO','PSX','BTE'],
+  'Technology':         ['SHOP','CSU','KXS','AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','ADBE','CSCO','INTC','AMD','QCOM'],
+  'Utilities':          ['AQN','FTS','EMA','H','CPX','NEE','DUK','SO','D','AEP','SRE','XEL','ED'],
+  'Industrials':        ['CNR','CP','CAE','MG','GE','CAT','DE','BA','HON','MMM','RTX','LMT'],
+  'Consumer Defensive': ['L','WN','MRU','DOL','EMP','WMT','PG','KO','PEP','MCD','COST'],
+  'Consumer Cyclical':  ['ATD','CTC','NKE','HD','TGT','LOW','SBUX','AMZN','TSLA'],
+  'Basic Materials':    ['ABX','AEM','WPM','FM','TECK','CCO','NTR'],
+  'Healthcare':         ['JNJ','PFE','UNH','ABT','MRK','BMY','LLY','ABBV','TMO','DHR','AMGN','GILD'],
+  'Real Estate':        ['BAM','BIP','BEP','AMT','PLD','CCI','EQIX','SPG','PSA','O'],
+  'Communication Services': ['GOOGL','META','NFLX','CSCO','T','VZ'],
+};
+
+var SCREENER_PRESETS = {
+  divgrowth: { 'scr-yield-min':'2', 'scr-pe-min':'5', 'scr-pe-max':'30', 'scr-beta-max':'1.5', 'scr-sortby':'dividendYield', 'scr-sortdir':'desc', 'scr-exchange':'', 'scr-sector':'' },
+  value:     { 'scr-pe-min':'5', 'scr-pe-max':'15', 'scr-sortby':'trailingPE', 'scr-sortdir':'asc', 'scr-exchange':'', 'scr-sector':'' },
+  momentum:  { 'scr-ret-min':'15', 'scr-sortby':'52wReturn', 'scr-sortdir':'desc', 'scr-exchange':'', 'scr-sector':'' },
+  tsxblue:   { 'scr-exchange':'tsx', 'scr-mktcap':'large', 'scr-yield-min':'1', 'scr-sortby':'marketCap', 'scr-sortdir':'desc', 'scr-sector':'' },
+  growth:    { 'scr-pe-min':'15', 'scr-beta-min':'0.8', 'scr-ret-min':'10', 'scr-sortby':'52wReturn', 'scr-sortdir':'desc', 'scr-exchange':'', 'scr-sector':'' },
+  clear:     { 'scr-pe-min':'', 'scr-pe-max':'', 'scr-yield-min':'', 'scr-yield-max':'', 'scr-price-min':'', 'scr-price-max':'', 'scr-ret-min':'', 'scr-ret-max':'', 'scr-beta-min':'', 'scr-beta-max':'', 'scr-exchange':'', 'scr-sector':'', 'scr-mktcap':'', 'scr-sortby':'marketCap', 'scr-sortdir':'desc' },
+};
+
+function applyScreenerPreset(name) {
+  ['divgrowth','value','momentum','tsxblue','growth','clear'].forEach(function(p) {
+    var b = document.getElementById('scr-preset-' + p);
+    if (b) b.classList.toggle('on', p === name);
+  });
+  var preset = SCREENER_PRESETS[name];
+  if (!preset) return;
+  Object.keys(preset).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = preset[id];
+  });
+}
+
+async function runScreener() {
+  var status = document.getElementById('scr-status');
+  var resultsEl = document.getElementById('scr-results');
+  var tbody = document.getElementById('scr-tbody');
+  var thead = document.getElementById('scr-thead');
+
+  // Read filters
+  var exchange  = document.getElementById('scr-exchange').value;
+  var sector    = document.getElementById('scr-sector').value;
+  var mktcap    = document.getElementById('scr-mktcap').value;
+  var peMin     = parseFloat(document.getElementById('scr-pe-min').value)    || null;
+  var peMax     = parseFloat(document.getElementById('scr-pe-max').value)    || null;
+  var yldMin    = parseFloat(document.getElementById('scr-yield-min').value) || null;
+  var yldMax    = parseFloat(document.getElementById('scr-yield-max').value) || null;
+  var prMin     = parseFloat(document.getElementById('scr-price-min').value) || null;
+  var prMax     = parseFloat(document.getElementById('scr-price-max').value) || null;
+  var retMin    = parseFloat(document.getElementById('scr-ret-min').value)   || null;
+  var retMax    = parseFloat(document.getElementById('scr-ret-max').value)   || null;
+  var betaMin   = parseFloat(document.getElementById('scr-beta-min').value)  || null;
+  var betaMax   = parseFloat(document.getElementById('scr-beta-max').value)  || null;
+  var sortBy    = document.getElementById('scr-sortby').value;
+  var sortDir   = document.getElementById('scr-sortdir').value;
+
+  // Build candidate list
+  var candidates = [];
+  if (exchange) {
+    candidates = SCREENER_UNIVERSE[exchange] || [];
+  } else {
+    // All exchanges
+    Object.values(SCREENER_UNIVERSE).forEach(function(arr) {
+      arr.forEach(function(t) { if (candidates.indexOf(t) === -1) candidates.push(t); });
+    });
+  }
+  // Filter by sector first (pre-filter before fetching)
+  if (sector && SECTOR_MAP[sector]) {
+    candidates = candidates.filter(function(t) { return SECTOR_MAP[sector].indexOf(t) > -1; });
+  }
+  if (!candidates.length) { status.textContent = 'No candidates match those filters'; return; }
+
+  status.textContent = 'Fetching data for ' + candidates.length + ' stocks…';
+  resultsEl.style.display = 'none';
+
+  // Fetch all candidates in batches of 8 to avoid rate limits
+  var results = [];
+  var batchSize = 8;
+  for (var bi = 0; bi < candidates.length; bi += batchSize) {
+    var batch = candidates.slice(bi, bi + batchSize);
+    status.textContent = 'Fetching ' + Math.min(bi+batchSize, candidates.length) + ' / ' + candidates.length + '…';
+    var batchResults = await Promise.all(batch.map(async function(ticker) {
+      try {
+        var isTSXTicker = SCREENER_UNIVERSE.tsx.indexOf(ticker) > -1;
+        var yahooTicker = isTSXTicker ? ticker + '.TO' : ticker;
+        var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(yahooTicker) +
+          '?interval=1wk&range=1y';
+        var raw = await fetchViaProxy(url);
+        if (!raw) return null;
+        var jdata = JSON.parse(raw);
+        var res = jdata.chart && jdata.chart.result && jdata.chart.result[0];
+        if (!res) return null;
+        var meta = res.meta;
+        var closes = res.indicators.quote[0].close || [];
+        var firstClose = closes.find(function(c){ return c; });
+        var price = meta.regularMarketPrice;
+        var ret52w = firstClose ? ((price - firstClose) / firstClose * 100) : null;
+        var divYield = (meta.dividendYield || meta.trailingAnnualDividendYield || 0) * 100;
+        return {
+          ticker: ticker,
+          yahooTicker: yahooTicker,
+          name: meta.shortName || meta.longName || ticker,
+          price: price,
+          marketCap: meta.marketCap || 0,
+          trailingPE: meta.trailingPE || null,
+          dividendYield: divYield || 0,
+          beta: meta.beta || null,
+          '52wReturn': ret52w,
+          low52: meta.fiftyTwoWeekLow,
+          high52: meta.fiftyTwoWeekHigh,
+          exchange: isTSXTicker ? 'TSX' : (meta.exchangeName || 'US'),
+        };
+      } catch(e) { return null; }
+    }));
+    batchResults.forEach(function(r) { if (r) results.push(r); });
+    // Small pause between batches
+    await new Promise(function(res){ setTimeout(res, 200); });
+  }
+
+  // Apply numeric filters
+  var MKTCAP_RANGES = {
+    mega:  [200e9, Infinity], large: [10e9, 200e9], mid: [2e9, 10e9],
+    small: [300e6, 2e9],      micro: [0, 300e6]
+  };
+  results = results.filter(function(r) {
+    if (peMin  !== null && (r.trailingPE === null || r.trailingPE < peMin))  return false;
+    if (peMax  !== null && (r.trailingPE === null || r.trailingPE > peMax))  return false;
+    if (yldMin !== null && r.dividendYield < yldMin)  return false;
+    if (yldMax !== null && r.dividendYield > yldMax)  return false;
+    if (prMin  !== null && r.price < prMin)            return false;
+    if (prMax  !== null && r.price > prMax)            return false;
+    if (retMin !== null && (r['52wReturn'] === null || r['52wReturn'] < retMin)) return false;
+    if (retMax !== null && (r['52wReturn'] === null || r['52wReturn'] > retMax)) return false;
+    if (betaMin !== null && (r.beta === null || r.beta < betaMin)) return false;
+    if (betaMax !== null && (r.beta === null || r.beta > betaMax)) return false;
+    if (mktcap && MKTCAP_RANGES[mktcap]) {
+      var range = MKTCAP_RANGES[mktcap];
+      if (r.marketCap < range[0] || r.marketCap > range[1]) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  results.sort(function(a, b) {
+    var av = a[sortBy], bv = b[sortBy];
+    if (av === null || av === undefined) return 1;
+    if (bv === null || bv === undefined) return -1;
+    return sortDir === 'desc' ? bv - av : av - bv;
+  });
+
+  status.textContent = results.length + ' stocks matched';
+
+  if (!results.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No stocks matched your filters — try loosening the criteria</td></tr>';
+    thead.innerHTML = '';
+    resultsEl.style.display = '';
+    return;
+  }
+
+  thead.innerHTML = '<th>Ticker</th><th>Name</th><th>Exchange</th><th>Price</th><th>Mkt Cap</th><th>P/E</th><th>Yield</th><th>52W Ret</th><th>Beta</th>';
+  tbody.innerHTML = results.map(function(r) {
+    var owned = holdings.some(function(h){ return h.ticker === r.ticker; });
+    var inWl  = watchlist.some(function(w){ return w.ticker === r.ticker; });
+    return '<tr style="' + (owned ? 'background:rgba(200,240,74,.04)' : '') + '">' +
+      '<td><span class="badge" style="cursor:pointer" onclick="quickSearchFromScreener(\"' + r.ticker + '\")">' + r.ticker + '</span>' +
+        (owned ? ' <span style="font-size:9px;background:rgba(200,240,74,.2);color:var(--accent);border-radius:3px;padding:1px 4px">owned</span>' : '') +
+        (inWl  ? ' <span style="font-size:9px;background:rgba(74,240,200,.15);color:#4af0c8;border-radius:3px;padding:1px 4px">watching</span>' : '') +
+      '</td>' +
+      '<td style="color:var(--muted);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + r.name + '</td>' +
+      '<td style="color:var(--muted)">' + r.exchange + '</td>' +
+      '<td style="font-family:var(--fm)">$' + r.price.toFixed(2) + '</td>' +
+      '<td style="font-family:var(--fm)">' + fmtLargeNum(r.marketCap) + '</td>' +
+      '<td style="font-family:var(--fm)">' + (r.trailingPE ? r.trailingPE.toFixed(1)+'x' : '—') + '</td>' +
+      '<td class="' + (r.dividendYield>0?'up':'') + '" style="font-family:var(--fm)">' + (r.dividendYield>0 ? r.dividendYield.toFixed(2)+'%' : '—') + '</td>' +
+      '<td class="' + (r['52wReturn']>=0?'up':'dn') + '" style="font-family:var(--fm)">' + (r['52wReturn']!==null?(r['52wReturn']>=0?'+':'')+r['52wReturn'].toFixed(1)+'%':'—') + '</td>' +
+      '<td style="font-family:var(--fm)">' + (r.beta!==null?r.beta.toFixed(2):'—') + '</td>' +
+      '</tr>';
+  }).join('');
+
+  resultsEl.style.display = '';
+}
+
+function quickSearchFromScreener(ticker) {
+  // Scroll to search bar and load
+  document.getElementById('srch-input').value = ticker;
+  document.getElementById('srch-input').scrollIntoView({ behavior:'smooth', block:'center' });
+  searchStock();
 }
 
 // ══════════════════════════════════════════════════════════════
