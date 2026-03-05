@@ -109,6 +109,8 @@ canvas{max-height:250px !important}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .del-btn { background:transparent;border:none;color:#555;cursor:pointer;font-size:14px;padding:2px 8px;border-radius:4px; }
 .del-btn:hover { color:#ff5e5e; }
+/* Force Chart.js legend text white regardless of browser defaults */
+canvas + * { color: #e8eaf0 !important; }
 @media(max-width:700px){
   .stat-grid{grid-template-columns:1fr 1fr!important}
   .two-col{grid-template-columns:1fr!important}
@@ -2557,7 +2559,7 @@ function renderAllocation() {
           var ds = chart.data.datasets[0];
           var total = ds.data.reduce(function(a,b){return a+b;},0);
           return chart.data.labels.map(function(lbl,i){
-            return { text: lbl + ' ' + (total>0?(ds.data[i]/total*100).toFixed(1)+'%':''), fillStyle: ds.backgroundColor[i], hidden: false, index: i };
+            return { text: lbl + ' ' + (total>0?(ds.data[i]/total*100).toFixed(1)+'%':''), fillStyle: ds.backgroundColor[i], fontColor: '#e8eaf0', color: '#e8eaf0', strokeStyle: 'transparent', hidden: false, index: i };
           });
         }}},
         tooltip: { callbacks: { label: function(ctx){ var total=ctx.dataset.data.reduce(function(a,b){return a+b;},0); return ctx.label+': $'+ctx.parsed.toFixed(2)+' ('+(ctx.parsed/total*100).toFixed(1)+'%)'; } } }
@@ -2580,7 +2582,7 @@ function renderAllocation() {
           var ds = chart.data.datasets[0];
           var total = ds.data.reduce(function(a,b){return a+b;},0);
           return chart.data.labels.map(function(lbl,i){
-            return { text: lbl + ' ' + (total>0?(ds.data[i]/total*100).toFixed(1)+'%':''), fillStyle: ds.backgroundColor[i], hidden:false, index:i };
+            return { text: lbl + ' ' + (total>0?(ds.data[i]/total*100).toFixed(1)+'%':''), fillStyle: ds.backgroundColor[i], fontColor: '#e8eaf0', color: '#e8eaf0', strokeStyle: 'transparent', hidden:false, index:i };
           });
         }}},
         tooltip: { callbacks: { label: function(ctx){ var total=ctx.dataset.data.reduce(function(a,b){return a+b;},0); return ctx.label+': $'+ctx.parsed.toFixed(2)+' ('+(ctx.parsed/total*100).toFixed(1)+'%)'; } } }
