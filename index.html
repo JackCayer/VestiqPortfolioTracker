@@ -811,6 +811,7 @@ async function fetchPrices() {
   var now = new Date().toLocaleTimeString('en-CA', {hour:'2-digit', minute:'2-digit'});
   document.getElementById('lastUpdated').textContent = 'Updated ' + now;
   renderAll();
+  saveDailySnapshot();
 }
 
 // ── ENRICH DATA ───────────────────────────────────────────────────────────
@@ -2361,6 +2362,52 @@ if (firebaseConfig) {
 setInterval(fetchPrices, 15000);
 
 // ══════════════════════════════════════════════════════════════
+// DAILY PORTFOLIO SNAPSHOT
+// ══════════════════════════════════════════════════════════════
+async function saveDailySnapshot() {
+  if (!firebaseDB || !holdings.length) return;
+
+  var today = new Date().toISOString().substr(0, 10); // YYYY-MM-DD
+
+  // Only save once per day — check if today already exists
+  try {
+    var snapDoc = await firebaseDB.collection('vestiq').doc('snapshots').get();
+    var existing = snapDoc.exists ? (JSON.parse(snapDoc.data().daily || '{}')) : {};
+    if (existing[today]) return; // already saved today
+
+    // Compute current portfolio state
+    var data = enrich();
+    if (!data.length) return;
+    var tv = data.reduce(function(s,h){ return s+h.mktValue; }, 0);
+    var totalContrib = contributions.reduce(function(s,c){ return s+c.amount; }, 0);
+    var totalDivs    = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; })
+                         .reduce(function(s,t){ return s+t.amount; }, 0);
+    var totalReturn  = totalContrib > 0 ? ((tv - totalContrib + totalDivs) / totalContrib * 100) : 0;
+
+    existing[today] = {
+      value:   +tv.toFixed(2),
+      contrib: +totalContrib.toFixed(2),
+      divs:    +totalDivs.toFixed(2),
+      retPct:  +totalReturn.toFixed(4)
+    };
+
+    await firebaseDB.collection('vestiq').doc('snapshots').set({ daily: JSON.stringify(existing) });
+    console.log('[SNAP] Saved snapshot for ' + today + ': $' + tv.toFixed(2) + ' (' + totalReturn.toFixed(2) + '%)');
+  } catch(e) {
+    console.log('[SNAP] Failed to save snapshot:', e);
+  }
+}
+
+async function loadSnapshots() {
+  if (!firebaseDB) return {};
+  try {
+    var snapDoc = await firebaseDB.collection('vestiq').doc('snapshots').get();
+    if (!snapDoc.exists) return {};
+    return JSON.parse(snapDoc.data().daily || '{}');
+  } catch(e) { return {}; }
+}
+
+// ══════════════════════════════════════════════════════════════
 // THEME TOGGLE
 // ══════════════════════════════════════════════════════════════
 function toggleTheme() {
@@ -2490,8 +2537,20 @@ function renderAllocation() {
   var el = document.getElementById('cAlloc');
   if (el) myCharts['cAlloc'] = new Chart(el, {
     type: 'doughnut',
-    data: { labels: labels, datasets: [{ data: values, backgroundColor: colors.slice(0,labels.length), borderWidth: 2, borderColor: 'var(--bg)' }] },
-    options: { plugins: { legend: { position:'right', labels:{ color:'var(--text)', font:{size:11} } } }, cutout:'60%' }
+    data: { labels: labels, datasets: [{ data: values, backgroundColor: colors.slice(0,labels.length), borderWidth: 2, borderColor: '#080910' }] },
+    options: {
+      plugins: {
+        legend: { position:'right', labels:{ color:'#e8eaf0', font:{size:11}, generateLabels: function(chart) {
+          var ds = chart.data.datasets[0];
+          var total = ds.data.reduce(function(a,b){return a+b;},0);
+          return chart.data.labels.map(function(lbl,i){
+            return { text: lbl + ' ' + (total>0?(ds.data[i]/total*100).toFixed(1)+'%':''), fillStyle: ds.backgroundColor[i], hidden: false, index: i };
+          });
+        }}},
+        tooltip: { callbacks: { label: function(ctx){ var total=ctx.dataset.data.reduce(function(a,b){return a+b;},0); return ctx.label+': $'+ctx.parsed.toFixed(2)+' ('+(ctx.parsed/total*100).toFixed(1)+'%)'; } } }
+      },
+      cutout:'60%'
+    }
   });
 
   // Currency split
@@ -2501,62 +2560,247 @@ function renderAllocation() {
   var el2 = document.getElementById('cCurrency');
   if (el2) myCharts['cCurrency'] = new Chart(el2, {
     type: 'doughnut',
-    data: { labels: ['CAD','USD→CAD'], datasets: [{ data: [cadVal, usdVal], backgroundColor: ['#4af0c8','#c8f04a'], borderWidth:2, borderColor:'var(--bg)' }] },
-    options: { plugins: { legend: { position:'right', labels:{ color:'var(--text)', font:{size:12} } } }, cutout:'60%' }
+    data: { labels: ['CAD','USD→CAD'], datasets: [{ data: [cadVal, usdVal], backgroundColor: ['#4af0c8','#c8f04a'], borderWidth:2, borderColor:'#080910' }] },
+    options: {
+      plugins: {
+        legend: { position:'right', labels:{ color:'#e8eaf0', font:{size:12}, generateLabels: function(chart){
+          var ds = chart.data.datasets[0];
+          var total = ds.data.reduce(function(a,b){return a+b;},0);
+          return chart.data.labels.map(function(lbl,i){
+            return { text: lbl + ' ' + (total>0?(ds.data[i]/total*100).toFixed(1)+'%':''), fillStyle: ds.backgroundColor[i], hidden:false, index:i };
+          });
+        }}},
+        tooltip: { callbacks: { label: function(ctx){ var total=ctx.dataset.data.reduce(function(a,b){return a+b;},0); return ctx.label+': $'+ctx.parsed.toFixed(2)+' ('+(ctx.parsed/total*100).toFixed(1)+'%)'; } } }
+      },
+      cutout:'60%'
+    }
   });
 
-  // Benchmark chart — portfolio return % vs XIC (TSX composite ETF)
+  // Benchmark chart — true historical portfolio snapshots vs XIC
   (async function() {
     try {
-      var benchUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/XIC.TO?interval=1mo&range=1y';
-      var raw = await fetchViaProxy(benchUrl);
-      if (!raw) throw new Error('no data');
-      var bdata = JSON.parse(raw);
-      var result = bdata.chart.result[0];
-      var timestamps = result.timestamp;
-      var closes = result.indicators.quote[0].close;
-      var benchLabels = timestamps.map(function(ts){ return new Date(ts*1000).toISOString().substr(0,7); });
-      var benchBase = closes[0];
-      var benchPcts = closes.map(function(c){ return c ? ((c-benchBase)/benchBase*100) : null; });
+      var bEl = document.getElementById('cBench');
+      if (!bEl) return;
 
-      // Portfolio return % over same period from contributions
-      var portfolioData = {};
-      var firstDate = contributions.length ? contributions[0].date.substr(0,7) : null;
-      if (firstDate) {
-        var totalContrib = 0;
-        var contribByMonth = {};
-        contributions.forEach(function(c) {
-          var m = c.date.substr(0,7);
-          contribByMonth[m] = (contribByMonth[m]||0) + c.amount;
-        });
-        // Approximate portfolio value growth using current holdings
-        var tv = data.reduce(function(s,h){ return s+h.mktValue; },0);
-        var tc = data.reduce(function(s,h){ return s+h.costBasis; },0);
-        var overallPct = tc > 0 ? ((tv-tc)/tc*100) : 0;
+      // ── Step 1: build list of month-end labels from first tx to now ────
+      var allTxDates = transactions.map(function(t){ return t.date; }).sort();
+      if (!allTxDates.length) return;
+      var firstMonth = allTxDates[0].substr(0,7);
+      var today = new Date();
+      var curY = today.getFullYear(), curM = today.getMonth();
+      var months = [];
+      var d = new Date(firstMonth + '-01');
+      while (d.getFullYear() < curY || (d.getFullYear() === curY && d.getMonth() <= curM)) {
+        months.push(d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'));
+        d.setMonth(d.getMonth()+1);
       }
 
+      // ── Step 2: check cache in Firebase ───────────────────────────────
+      var cacheKey = 'histPrices_' + firstMonth + '_' + months[months.length-1];
+      var histPrices = null; // { ticker: { 'YYYY-MM': price } }
+
+      if (firebaseDB) {
+        try {
+          var cacheDoc = await firebaseDB.collection('vestiq').doc('histCache').get();
+          if (cacheDoc.exists) {
+            var cdata = cacheDoc.data();
+            if (cdata[cacheKey]) {
+              histPrices = JSON.parse(cdata[cacheKey]);
+              console.log('[BENCH] Loaded historical prices from cache');
+            }
+          }
+        } catch(e) { console.log('[BENCH] Cache read failed:', e); }
+      }
+
+      // ── Step 3: if no cache, fetch all tickers + XIC in one pass ──────
+      if (!histPrices) {
+        bEl.parentElement.querySelector('.ctitle').textContent = 'Benchmark vs Portfolio — fetching history...';
+        var monthsSince = months.length + 2;
+        var rangeStr = Math.min(60, Math.max(2, monthsSince)) + 'mo';
+
+        // Unique tickers ever traded
+        var tradedTickers = [];
+        transactions.forEach(function(t) {
+          if ((t.type==='BUY'||t.type==='SELL') && t.ticker && tradedTickers.indexOf(t.ticker) === -1)
+            tradedTickers.push(t.ticker);
+        });
+        tradedTickers.push('XIC.TO'); // benchmark
+
+        histPrices = {};
+        var TSX  = ['XGD','RY','TD','FTS','SVR','BCE','ENB'];
+        var TSXV = ['FO'];
+
+        for (var ti = 0; ti < tradedTickers.length; ti++) {
+          var rawTicker = tradedTickers[ti];
+          var isTSX  = TSX.indexOf(rawTicker) > -1;
+          var isTSXV = TSXV.indexOf(rawTicker) > -1;
+          var yahooT = rawTicker === 'XIC.TO' ? 'XIC.TO' : (isTSXV ? rawTicker+'.V' : isTSX ? rawTicker+'.TO' : rawTicker);
+          try {
+            var url = 'https://query1.finance.yahoo.com/v8/finance/chart/' + yahooT + '?interval=1mo&range=' + rangeStr;
+            var raw = await fetchWithRetry(url, 1);
+            if (!raw) continue;
+            var jdata = JSON.parse(raw);
+            var res   = jdata.chart && jdata.chart.result && jdata.chart.result[0];
+            if (!res) continue;
+            var tss    = res.timestamp || [];
+            var cls    = res.indicators.quote[0].close || [];
+            var isCad  = isTSX || isTSXV || rawTicker === 'XIC.TO';
+            histPrices[rawTicker] = {};
+            tss.forEach(function(ts, i) {
+              if (!cls[i]) return;
+              var mo = new Date(ts*1000).toISOString().substr(0,7);
+              // Store as CAD — apply cadPerUsd for USD stocks
+              histPrices[rawTicker][mo] = isCad ? cls[i] : cls[i] * cadPerUsd;
+            });
+          } catch(e) { console.log('[BENCH] Failed fetching ' + rawTicker, e); }
+        }
+
+        // Save to Firebase cache
+        if (firebaseDB) {
+          try {
+            var saveObj = {};
+            saveObj[cacheKey] = JSON.stringify(histPrices);
+            await firebaseDB.collection('vestiq').doc('histCache').set(saveObj, { merge: true });
+            console.log('[BENCH] Cached historical prices');
+          } catch(e) { console.log('[BENCH] Cache save failed:', e); }
+        }
+        bEl.parentElement.querySelector('.ctitle').textContent = 'Benchmark vs Portfolio';
+      }
+
+      // ── Step 4: load real daily snapshots and merge with reconstructed ──
+      var realSnaps = await loadSnapshots(); // { 'YYYY-MM-DD': { value, contrib, divs, retPct } }
+
+      // Build month -> best retPct from real snapshots (use last day of each month)
+      var snapByMonth = {};
+      Object.keys(realSnaps).forEach(function(day) {
+        var month = day.substr(0,7);
+        // Keep the latest snapshot per month
+        if (!snapByMonth[month] || day > snapByMonth[month].day) {
+          snapByMonth[month] = { day: day, retPct: realSnaps[day].retPct };
+        }
+      });
+
+      // ── Step 4b: reconstruct portfolio value at each month-end ────────
+      // Replay transactions up to each month and compute holdings × hist price
+      var portPcts = [];
+      var xicPcts  = [];
+      var xicBase  = null;
+      var validLabels = [];
+      var sourceLabels = []; // track 'real' vs 'reconstructed'
+
+      months.forEach(function(month) {
+        var monthEnd = month + '-31'; // use as upper bound string comparison
+
+        // Build lots held as of end of this month (FIFO)
+        var lots = {};
+        transactions.forEach(function(t) {
+          if (t.date > monthEnd) return;
+          if (t.type === 'BUY' && t.ticker && t.shares > 0) {
+            if (!lots[t.ticker]) lots[t.ticker] = [];
+            lots[t.ticker].push({ shares: t.shares, cost: t.amount });
+          } else if (t.type === 'SELL' && t.ticker && t.shares > 0) {
+            if (!lots[t.ticker]) return;
+            var toSell = t.shares;
+            lots[t.ticker] = lots[t.ticker].reduce(function(acc, lot) {
+              if (toSell <= 0) { acc.push(lot); return acc; }
+              if (lot.shares <= toSell) { toSell -= lot.shares; }
+              else { acc.push({ shares: lot.shares-toSell, cost: lot.cost*(1-toSell/lot.shares) }); toSell=0; }
+              return acc;
+            }, []);
+          }
+        });
+
+        // Cumulative contributions + dividends up to this month
+        var cumContrib = 0, cumDivs = 0;
+        transactions.forEach(function(t) {
+          if (t.date > monthEnd) return;
+          if (t.type === 'CONT') cumContrib += t.amount;
+          if (t.type === 'WD')   cumContrib -= Math.abs(t.amount);
+          if (t.type === 'DIV' || t.type === 'FPLINT') cumDivs += t.amount;
+        });
+        if (cumContrib <= 0) return;
+
+        // Portfolio value = sum of lots × historical month-end price
+        var portVal = 0;
+        var allPriced = true;
+        Object.keys(lots).forEach(function(ticker) {
+          var shares = lots[ticker].reduce(function(s,l){ return s+l.shares; }, 0);
+          if (shares < 0.0001) return;
+          var px = histPrices[ticker] && histPrices[ticker][month];
+          if (!px) { allPriced = false; return; }
+          portVal += shares * px;
+        });
+        if (!allPriced && Object.keys(lots).length > 0) return; // skip months with missing prices
+
+        // Use real snapshot if available for this month, else use reconstructed
+        var retPct;
+        if (snapByMonth[month]) {
+          retPct = snapByMonth[month].retPct;
+          sourceLabels.push('real');
+        } else {
+          retPct = (portVal - cumContrib + cumDivs) / cumContrib * 100;
+          sourceLabels.push('reconstructed');
+        }
+        portPcts.push(+retPct.toFixed(2));
+
+        // XIC return from first month
+        var xicPx = histPrices['XIC.TO'] && histPrices['XIC.TO'][month];
+        if (xicPx) {
+          if (xicBase === null) xicBase = xicPx;
+          xicPcts.push(+((xicPx - xicBase) / xicBase * 100).toFixed(2));
+        } else {
+          xicPcts.push(null);
+        }
+        validLabels.push(month);
+      });
+
+      if (!validLabels.length) throw new Error('no valid snapshots');
+
+      // ── Step 5: draw chart ────────────────────────────────────────────
       if (myCharts['cBench']) myCharts['cBench'].destroy();
-      var bEl = document.getElementById('cBench');
-      if (bEl) myCharts['cBench'] = new Chart(bEl, {
+      myCharts['cBench'] = new Chart(bEl, {
         type: 'line',
         data: {
-          labels: benchLabels,
+          labels: validLabels,
           datasets: [
-            { label: 'XIC (TSX)', data: benchPcts, borderColor: '#4af0c8', backgroundColor: 'rgba(74,240,200,.08)', tension: 0.3, pointRadius: 3, fill: true },
-            { label: 'Your Portfolio', data: benchLabels.map(function(){ return overallPct||null; }), borderColor: '#c8f04a', borderDash: [5,5], tension: 0, pointRadius: 0 }
+            {
+              label: 'Your Portfolio (Total Return %)',
+              data: portPcts,
+              borderColor: '#c8f04a',
+              backgroundColor: 'rgba(200,240,74,.08)',
+              tension: 0.3, pointRadius: 4, fill: true,
+              pointBackgroundColor: portPcts.map(function(_,i){ return sourceLabels[i]==='real' ? '#c8f04a' : 'rgba(200,240,74,.4)'; }),
+              pointRadius: portPcts.map(function(_,i){ return sourceLabels[i]==='real' ? 5 : 3; })
+            },
+            {
+              label: 'XIC — TSX Composite',
+              data: xicPcts,
+              borderColor: '#4af0c8',
+              backgroundColor: 'rgba(74,240,200,.06)',
+              tension: 0.3, pointRadius: 4, fill: true
+            }
           ]
         },
         options: {
-          plugins: { legend: { labels: { color:'var(--text)', font:{size:11} } } },
+          plugins: {
+            legend: { labels: { color:'#e8eaf0', font:{size:12} } },
+            tooltip: { callbacks: { label: function(ctx){
+              var src = ctx.datasetIndex === 0 ? (sourceLabels[ctx.dataIndex] === 'real' ? ' ✓ live' : ' ~ est.') : '';
+              return ctx.dataset.label + ': ' + (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%' + src;
+            }}}
+          },
           scales: {
-            x: { grid:{color:'#1e2030'}, ticks:{color:'#555',font:{size:10}} },
-            y: { grid:{color:'#1e2030'}, ticks:{color:'#555', callback:function(v){return v.toFixed(1)+'%';}} }
+            x: { grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#a0a8c0',font:{size:11}} },
+            y: { grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#a0a8c0',font:{size:11}, callback:function(v){ return (v>=0?'+':'')+v.toFixed(1)+'%'; }},
+                 plugins: { tooltip: {} } }
           }
         }
       });
+
     } catch(e) {
+      console.error('[BENCH]', e);
       var bEl = document.getElementById('cBench');
-      if (bEl) bEl.parentElement.innerHTML = '<div class="ctitle">Benchmark vs Portfolio</div><div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Could not load benchmark data</div>';
+      if (bEl) bEl.parentElement.innerHTML = '<div class="ctitle">Benchmark vs Portfolio</div><div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Could not build chart: ' + e.message + '</div>';
     }
   })();
 
