@@ -198,10 +198,10 @@ canvas + * { color: #e8eaf0 !important; }
       <span style="font-size:10px;color:var(--muted);font-family:var(--fm);text-transform:uppercase;letter-spacing:1px">Sort by</span>
       <button class="sort-btn on" id="sort-mktValue"    onclick="setSort('mktValue')">Market Value</button>
       <button class="sort-btn"    id="sort-gain"        onclick="setSort('gain')">Total Gain $</button>
-      <button class="sort-btn"    id="sort-gainPct"     onclick="setSort('gainPct')">Gain %</button>
-      <button class="sort-btn"    id="sort-dayChange"   onclick="setSort('dayChange')">Day Change</button>
+
+      <button class="sort-btn"    id="sort-dayChange"   onclick="setSort('dayChange')">Day P&amp;L</button>
       <button class="sort-btn"    id="sort-shares"      onclick="setSort('shares')">Shares</button>
-      <button class="sort-btn"    id="sort-changePct"   onclick="setSort('changePct')">Day %</button>
+
     </div>
   </div>
   <div class="card" style="overflow-x:auto">
@@ -212,9 +212,8 @@ canvas + * { color: #e8eaf0 !important; }
         <th>Avg Cost</th>
         <th onclick="setSort('price')"     style="cursor:pointer" id="th-price">Current ⇅</th>
         <th onclick="setSort('mktValue')"  style="cursor:pointer" id="th-mktValue">Mkt Value ⇅</th>
-        <th onclick="setSort('gain')"      style="cursor:pointer" id="th-gain">Gain $ ⇅</th>
-        <th onclick="setSort('gainPct')"   style="cursor:pointer" id="th-gainPct">Gain % ⇅</th>
-        <th onclick="setSort('dayChange')" style="cursor:pointer" id="th-dayChange">Day $ ⇅</th>
+        <th onclick="setSort('gain')"      style="cursor:pointer" id="th-gain">Gain ⇅</th>
+        <th onclick="setSort('dayChange')" style="cursor:pointer" id="th-dayChange">Day P&amp;L ⇅</th>
         <th>Notes</th>
       </tr></thead>
       <tbody id="dashBody"></tbody>
@@ -1091,9 +1090,8 @@ function renderAll() {
           '<td>' + (hideAmounts ? '••••••' : '$' + h.avgCostCAD.toFixed(2) + ' <span style="font-size:9px;font-family:var(--fm);color:var(--muted);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">CAD</span>') + '</td>' +
           '<td><strong>' + (hideAmounts ? '••••••' : '$' + (h.price ? h.price.toFixed(2) : '—')) + '</strong> <span style="font-size:9px;color:' + (h.currency === 'USD→CAD' ? 'var(--accent2)' : 'var(--muted)') + ';background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:1px 4px">' + (h.currency || 'CAD') + '</span></td>' +
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
-          '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain)) + '</td>' +
-          '<td>' + cpd(h.gainPct) + '</td>' +
-          '<td>' + (hideAmounts ? cpd(h.changePct||0) : cd(h.dayChange)) + '</td>' +
+          '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain) + ' <span style="font-size:10px;color:var(--muted)">' + cpd(h.gainPct) + '</span>') + '</td>' +
+          '<td>' + (hideAmounts ? cpd(h.changePct||0) : cd(h.dayChange) + ' <span style="font-size:10px;color:var(--muted)">' + cpd(h.changePct||0) + '</span>') + '</td>' +
           '<td style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (h.notes||'') + '</td>' +
           '</tr>';
       }).join('')
@@ -1162,13 +1160,20 @@ async function fetchViaProxy(targetUrl) {
   var proxies = [
     function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); },
     function(u) { return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); },
+    function(u) { return 'https://api.allorigins.win/get?url=' + encodeURIComponent(u); },
     function(u) { return 'https://thingproxy.freeboard.io/fetch/' + u; },
+    function(u) { return 'https://corsproxy.org/?' + encodeURIComponent(u); },
+    function(u) { return 'https://proxy.cors.sh/' + u; },
+    function(u) { return 'https://yacdn.org/proxy/' + u; },
   ];
 
   for (var i = 0; i < proxies.length; i++) {
     try {
       var proxyUrl = proxies[i](targetUrl);
-      var resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      var resp = await fetch(proxyUrl, {
+        signal: AbortSignal.timeout(6000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }
+      });
       if (!resp.ok) continue;
       var text = await resp.text();
       if (!text || text.trim() === '') continue;
