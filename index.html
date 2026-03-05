@@ -283,7 +283,7 @@ canvas{max-height:250px !important}
 <!-- ══════════════ CHARTS ══════════════ -->
 <div id="pane-charts" class="pane">
   <div class="chart-grid">
-    <div class="card"><div class="ctitle">Portfolio Allocation</div><canvas id="cAlloc"></canvas></div>
+    <div class="card"><div class="ctitle">Portfolio Allocation</div><canvas id="cAllocSmall"></canvas></div>
     <div class="card"><div class="ctitle">Gain / Loss per Position ($)</div><canvas id="cGain"></canvas></div>
     <div class="card"><div class="ctitle">Cost Basis vs Market Value</div><canvas id="cCost"></canvas></div>
     <div class="card"><div class="ctitle">Return % per Position</div><canvas id="cRet"></canvas></div>
@@ -1343,7 +1343,7 @@ function drawCharts(data) {
 
   var labels = data.map(function(h){ return h.ticker; });
 
-  mk('cAlloc', { type: 'doughnut', data: {
+  mk('cAllocSmall', { type: 'doughnut', data: {
     labels: labels,
     datasets: [{ data: data.map(function(h){ return +h.mktValue.toFixed(2); }),
       backgroundColor: data.map(function(h){ return h.color; }), borderColor: '#13141c', borderWidth: 3 }]
@@ -2504,6 +2504,61 @@ function renderAllocation() {
     data: { labels: ['CAD','USD→CAD'], datasets: [{ data: [cadVal, usdVal], backgroundColor: ['#4af0c8','#c8f04a'], borderWidth:2, borderColor:'var(--bg)' }] },
     options: { plugins: { legend: { position:'right', labels:{ color:'var(--text)', font:{size:12} } } }, cutout:'60%' }
   });
+
+  // Benchmark chart — portfolio return % vs XIC (TSX composite ETF)
+  (async function() {
+    try {
+      var benchUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/XIC.TO?interval=1mo&range=1y';
+      var raw = await fetchViaProxy(benchUrl);
+      if (!raw) throw new Error('no data');
+      var bdata = JSON.parse(raw);
+      var result = bdata.chart.result[0];
+      var timestamps = result.timestamp;
+      var closes = result.indicators.quote[0].close;
+      var benchLabels = timestamps.map(function(ts){ return new Date(ts*1000).toISOString().substr(0,7); });
+      var benchBase = closes[0];
+      var benchPcts = closes.map(function(c){ return c ? ((c-benchBase)/benchBase*100) : null; });
+
+      // Portfolio return % over same period from contributions
+      var portfolioData = {};
+      var firstDate = contributions.length ? contributions[0].date.substr(0,7) : null;
+      if (firstDate) {
+        var totalContrib = 0;
+        var contribByMonth = {};
+        contributions.forEach(function(c) {
+          var m = c.date.substr(0,7);
+          contribByMonth[m] = (contribByMonth[m]||0) + c.amount;
+        });
+        // Approximate portfolio value growth using current holdings
+        var tv = data.reduce(function(s,h){ return s+h.mktValue; },0);
+        var tc = data.reduce(function(s,h){ return s+h.costBasis; },0);
+        var overallPct = tc > 0 ? ((tv-tc)/tc*100) : 0;
+      }
+
+      if (myCharts['cBench']) myCharts['cBench'].destroy();
+      var bEl = document.getElementById('cBench');
+      if (bEl) myCharts['cBench'] = new Chart(bEl, {
+        type: 'line',
+        data: {
+          labels: benchLabels,
+          datasets: [
+            { label: 'XIC (TSX)', data: benchPcts, borderColor: '#4af0c8', backgroundColor: 'rgba(74,240,200,.08)', tension: 0.3, pointRadius: 3, fill: true },
+            { label: 'Your Portfolio', data: benchLabels.map(function(){ return overallPct||null; }), borderColor: '#c8f04a', borderDash: [5,5], tension: 0, pointRadius: 0 }
+          ]
+        },
+        options: {
+          plugins: { legend: { labels: { color:'var(--text)', font:{size:11} } } },
+          scales: {
+            x: { grid:{color:'#1e2030'}, ticks:{color:'#555',font:{size:10}} },
+            y: { grid:{color:'#1e2030'}, ticks:{color:'#555', callback:function(v){return v.toFixed(1)+'%';}} }
+          }
+        }
+      });
+    } catch(e) {
+      var bEl = document.getElementById('cBench');
+      if (bEl) bEl.parentElement.innerHTML = '<div class="ctitle">Benchmark vs Portfolio</div><div style="color:var(--muted);font-size:12px;padding:20px;text-align:center">Could not load benchmark data</div>';
+    }
+  })();
 
   // Allocation table
   document.getElementById('allocBody').innerHTML = sorted.map(function(h) {
