@@ -1658,6 +1658,9 @@ function renderTxnTable() {
 }
 
 function deleteTxn(id) {
+  var t = transactions.find(function(x){ return x.id === id; });
+  var label = t ? (t.date + ' ' + t.type + (t.ticker ? ' ' + t.ticker : '') + (t.amount ? ' $' + Math.abs(t.amount).toFixed(2) : '')) : 'this transaction';
+  if (!confirm('Delete ' + label + '?')) return;
   transactions = transactions.filter(function(t){ return t.id !== id; });
   saveTxns();
   rebuildHoldingsFromTxns();
@@ -2119,6 +2122,9 @@ function addContrib() {
 }
 
 function delContrib(id) {
+  var c = contributions.find(function(x){ return x.id === id; });
+  var label = c ? (c.date + ' $' + Math.abs(c.amount).toFixed(2)) : 'this contribution';
+  if (!confirm('Delete ' + label + '?')) return;
   contributions = contributions.filter(function(c){ return c.id !== id; });
   saveContribs(); renderContribs();
 }
@@ -2536,28 +2542,126 @@ function calcProjAnnualDivs() {
 // ══════════════════════════════════════════════════════════════
 function renderDivCalendar() {
   var divTxns = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; });
-  var byTickerMonth = {};
-  divTxns.forEach(function(t) {
-    var month = parseInt(t.date.substr(5,2));
-    var k = t.ticker||'OTHER';
-    if (!byTickerMonth[k]) byTickerMonth[k] = {};
-    if (!byTickerMonth[k][month]) byTickerMonth[k][month] = 0;
-    byTickerMonth[k][month] += t.amount;
-  });
-  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var tickers = Object.keys(byTickerMonth).sort();
-  if (!tickers.length) return;
+  if (!divTxns.length) return;
   var calEl = document.getElementById('divCalendar');
   if (!calEl) return;
-  var html = '<table class="tbl"><thead><tr><th>Ticker</th>' + months.map(function(m){ return '<th>' + m + '</th>'; }).join('') + '</tr></thead><tbody>';
+
+  var today = new Date();
+  var currentYear = today.getFullYear();
+
+  // Build per-ticker payment history
+  var byTicker = {};
+  divTxns.forEach(function(t) {
+    var k = t.ticker || 'OTHER';
+    if (!byTicker[k]) byTicker[k] = [];
+    byTicker[k].push({ date: t.date, amount: t.amount, month: parseInt(t.date.substr(5,2)) });
+  });
+
+  // For each ticker estimate frequency and next payments
+  var estimated = {}; // ticker -> { month -> { amt, isEstimate } }
+  Object.keys(byTicker).forEach(function(ticker) {
+    estimated[ticker] = {};
+    var payments = byTicker[ticker].slice().sort(function(a,b){ return a.date.localeCompare(b.date); });
+
+    // Record actual payments for current year
+    payments.forEach(function(p) {
+      if (p.date.startsWith(currentYear + '')) {
+        estimated[ticker][p.month] = { amt: p.amount, isEstimate: false };
+      }
+    });
+
+    // Estimate frequency from gap between payments
+    var avgGapDays = 91; // default quarterly
+    var avgAmt = payments.reduce(function(s,p){ return s+p.amount; },0) / payments.length;
+    if (payments.length >= 2) {
+      var gaps = [];
+      for (var i = 1; i < payments.length; i++) {
+        var d1 = new Date(payments[i-1].date);
+        var d2 = new Date(payments[i].date);
+        gaps.push((d2-d1)/(1000*60*60*24));
+      }
+      avgGapDays = gaps.reduce(function(s,g){ return s+g; },0) / gaps.length;
+    }
+
+    // Project forward from last payment
+    var last = new Date(payments[payments.length-1].date);
+    var maxProjections = 5;
+    for (var proj = 1; proj <= maxProjections; proj++) {
+      var nextDate = new Date(last.getTime() + avgGapDays * proj * 24 * 60 * 60 * 1000);
+      if (nextDate.getFullYear() !== currentYear) continue;
+      var nextMonth = nextDate.getMonth() + 1;
+      if (!estimated[ticker][nextMonth]) {
+        estimated[ticker][nextMonth] = { amt: avgAmt, isEstimate: true };
+      }
+    }
+  });
+
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var tickers = Object.keys(estimated).sort();
+
+  // Calculate monthly totals
+  var monthTotals = {};
+  var monthEstTotals = {};
   tickers.forEach(function(ticker) {
+    for (var m = 1; m <= 12; m++) {
+      var entry = estimated[ticker][m];
+      if (!entry) return;
+      if (!entry.isEstimate) monthTotals[m] = (monthTotals[m]||0) + entry.amt;
+      else monthEstTotals[m] = (monthEstTotals[m]||0) + entry.amt;
+    }
+  });
+
+  var html = '<div style="margin-bottom:8px;font-size:11px;color:var(--muted);font-family:var(--fm)">' +
+    '<span style="background:rgba(74,240,200,.15);border:1px solid rgba(74,240,200,.3);border-radius:3px;padding:1px 6px;margin-right:8px">confirmed</span>' +
+    '<span style="background:rgba(200,240,74,.08);border:1px dashed rgba(200,240,74,.3);border-radius:3px;padding:1px 6px">estimated</span>' +
+    '</div>';
+  html += '<table class="tbl" style="font-size:11px"><thead><tr>' +
+    '<th style="min-width:60px">Ticker</th>' +
+    months.map(function(m,i){
+      var mn = i+1;
+      var isCurrent = mn === today.getMonth()+1;
+      return '<th style="' + (isCurrent?'background:rgba(200,240,74,.07);':'') + 'text-align:center;min-width:52px">' + m + '</th>';
+    }).join('') +
+    '<th>Total</th></tr></thead><tbody>';
+
+  tickers.forEach(function(ticker) {
+    var rowTotal = 0;
     html += '<tr><td><span class="badge">' + ticker + '</span></td>';
     for (var m = 1; m <= 12; m++) {
-      var amt = byTickerMonth[ticker][m] || 0;
-      html += '<td>' + (amt > 0 ? '<span class="up" style="font-size:11px">$' + amt.toFixed(2) + '</span>' : '<span style="color:var(--border)">·</span>') + '</td>';
+      var entry = estimated[ticker][m];
+      var isCurrent = m === today.getMonth()+1;
+      var bg = isCurrent ? 'background:rgba(200,240,74,.05);' : '';
+      if (entry) {
+        rowTotal += entry.amt;
+        if (entry.isEstimate) {
+          html += '<td style="text-align:center;' + bg + '"><span style="color:var(--accent);font-size:10px;background:rgba(200,240,74,.08);border:1px dashed rgba(200,240,74,.25);border-radius:3px;padding:1px 4px">~$' + entry.amt.toFixed(2) + '</span></td>';
+        } else {
+          html += '<td style="text-align:center;' + bg + '"><span class="up" style="font-size:10px;background:rgba(74,240,200,.1);border:1px solid rgba(74,240,200,.2);border-radius:3px;padding:1px 4px">$' + entry.amt.toFixed(2) + '</span></td>';
+        }
+      } else {
+        html += '<td style="text-align:center;' + bg + '"><span style="color:var(--border)">·</span></td>';
+      }
     }
-    html += '</tr>';
+    html += '<td style="color:var(--muted);font-size:10px;font-family:var(--fm)">$' + rowTotal.toFixed(2) + '</td></tr>';
   });
+
+  // Totals row
+  html += '<tr style="border-top:1px solid var(--border)"><td style="font-size:10px;color:var(--muted);font-family:var(--fm)">TOTAL</td>';
+  var grandTotal = 0;
+  for (var m = 1; m <= 12; m++) {
+    var conf = monthTotals[m] || 0;
+    var est  = monthEstTotals[m] || 0;
+    var combined = conf + est;
+    grandTotal += combined;
+    var isCurrent = m === today.getMonth()+1;
+    var bg = isCurrent ? 'background:rgba(200,240,74,.05);' : '';
+    if (combined > 0) {
+      html += '<td style="text-align:center;' + bg + ';font-family:var(--fm);font-size:10px;color:var(--accent2)">$' + combined.toFixed(2) + '</td>';
+    } else {
+      html += '<td style="text-align:center;' + bg + '"><span style="color:var(--border)">·</span></td>';
+    }
+  }
+  html += '<td style="font-family:var(--fm);font-size:10px;color:var(--accent2)">$' + grandTotal.toFixed(2) + '</td></tr>';
   html += '</tbody></table>';
   calEl.innerHTML = html;
 }
