@@ -1355,7 +1355,7 @@ function drawCharts(data) {
     datasets: [{ label: 'Gain / Loss ($)', data: data.map(function(h){ return +h.gain.toFixed(2); }),
       backgroundColor: data.map(function(h){ return h.gain >= 0 ? 'rgba(74,240,160,.7)' : 'rgba(255,94,94,.7)'; }),
       borderRadius: 6, borderSkipped: false }]
-  }, options: { plugins:{ legend:{ display:false }}, scales:{ y:{ grid:{ color:'#1e2030' }}, x:{ grid:{ display:false }}}}});
+  }, options: { plugins:{ legend:{ display:false }}, scales:{ y:{ grid:{ color:'rgba(255,255,255,.06)' }, ticks:{color:'#a0a8c0'}}, x:{ grid:{ display:false }, ticks:{color:'#a0a8c0'}}}}});
 
   mk('cCost', { type: 'bar', data: {
     labels: labels,
@@ -1363,14 +1363,14 @@ function drawCharts(data) {
       { label: 'Cost Basis',   data: data.map(function(h){ return +h.costBasis.toFixed(2); }), backgroundColor: 'rgba(167,139,250,.7)', borderRadius: 4 },
       { label: 'Market Value', data: data.map(function(h){ return +h.mktValue.toFixed(2);  }), backgroundColor: 'rgba(200,240,74,.7)',  borderRadius: 4 }
     ]
-  }, options: { plugins:{ legend:{ labels:{ font:{ size:11 }}}}, scales:{ y:{ grid:{ color:'#1e2030' }}, x:{ grid:{ display:false }}}}});
+  }, options: { plugins:{ legend:{ labels:{ color:'#e8eaf0', font:{ size:11 }}}}, scales:{ y:{ grid:{ color:'rgba(255,255,255,.06)' }, ticks:{color:'#a0a8c0'}}, x:{ grid:{ display:false }, ticks:{color:'#a0a8c0'}}}}});
 
   mk('cRet', { type: 'bar', data: {
     labels: labels,
     datasets: [{ label: 'Return %', data: data.map(function(h){ return +h.gainPct.toFixed(2); }),
       backgroundColor: data.map(function(h){ return h.gainPct >= 0 ? 'rgba(74,240,200,.7)' : 'rgba(255,94,94,.7)'; }),
       borderRadius: 6, borderSkipped: false }]
-  }, options: { indexAxis:'y', plugins:{ legend:{ display:false }}, scales:{ x:{ grid:{ color:'#1e2030' }}, y:{ grid:{ display:false }}}}});
+  }, options: { indexAxis:'y', plugins:{ legend:{ display:false }}, scales:{ x:{ grid:{ color:'rgba(255,255,255,.06)' }, ticks:{color:'#a0a8c0'}}, y:{ grid:{ display:false }, ticks:{color:'#a0a8c0'}}}}});
 }
 
 // ── AI ADVISOR ────────────────────────────────────────────────────────────
@@ -2077,8 +2077,8 @@ function drawDivMonthlyChart(divTxns) {
     options: {
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { color:'#1e2030' }, ticks: { color:'#555', font:{ size:10 } } },
-        y: { grid: { color:'#1e2030' }, ticks: { color:'#555', callback: function(v){ return hideAmounts ? '••' : '$'+v.toFixed(2); } }, beginAtZero: true }
+        x: { grid: { color:'rgba(255,255,255,.06)' }, ticks: { color:'#a0a8c0', font:{ size:10 } } },
+        y: { grid: { color:'rgba(255,255,255,.06)' }, ticks: { color:'#a0a8c0', callback: function(v){ return hideAmounts ? '••' : '$'+v.toFixed(2); } }, beginAtZero: true }
       }
     }
   });
@@ -2102,8 +2102,8 @@ function drawDividendChart(tickerList) {
     options: {
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { color:'#1e2030' }, ticks: { color:'#555' } },
-        y: { grid: { color:'#1e2030' }, ticks: { color:'#555', callback: function(v){ return hideAmounts?'••••':'$'+v; } } }
+        x: { grid: { color:'rgba(255,255,255,.06)' }, ticks: { color:'#a0a8c0' } },
+        y: { grid: { color:'rgba(255,255,255,.06)' }, ticks: { color:'#a0a8c0', callback: function(v){ return hideAmounts?'••••':'$'+v; } } }
       }
     }
   });
@@ -2313,10 +2313,10 @@ function drawContribChart(currentValue, totalContrib) {
     },
     options: {
       parsing: { xAxisKey: 'x', yAxisKey: 'y' },
-      plugins: { legend: { labels: { font: { size: 11 }, color: '#888' }}},
+      plugins: { legend: { labels: { font: { size: 11 }, color: '#e8eaf0' }}},
       scales: {
-        x: { type: 'time', time: { unit: 'month' }, grid: { color: '#1e2030' }, ticks: { color: '#555', maxTicksLimit: 8 }},
-        y: { grid: { color: '#1e2030' }, ticks: { color: '#555', callback: function(v){ return hideAmounts ? '••••' : '$'+v.toLocaleString(); }}}
+        x: { type: 'time', time: { unit: 'month' }, grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#a0a8c0', maxTicksLimit: 8 }},
+        y: { grid: { color: 'rgba(255,255,255,.06)' }, ticks: { color: '#a0a8c0', callback: function(v){ return hideAmounts ? '••••' : '$'+v.toLocaleString(); }}}
       }
     }
   });
