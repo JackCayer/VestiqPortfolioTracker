@@ -579,6 +579,14 @@ canvas{max-height:250px !important}
 // ── STATE ─────────────────────────────────────────────────────────────────
 var holdings   = [];
 var prices     = {};
+// ── CHART GLOBAL DEFAULTS — set before any chart is created ─────────────
+Chart.defaults.color = '#a0a8c0';
+Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
+Chart.defaults.font.family = 'JetBrains Mono';
+Chart.defaults.plugins.legend.labels.color = '#e8eaf0';
+Chart.defaults.scale.grid.color = 'rgba(255,255,255,.06)';
+Chart.defaults.scale.ticks.color = '#a0a8c0';
+
 var myCharts   = {};
 var aiHistory  = [];
 var COLORS     = ['#c8f04a','#4af0c8','#ff6b9d','#a78bfa','#ffa94d','#51cf66','#60cdff','#f783ac','#ff922b','#38d9a9'];
@@ -1333,9 +1341,6 @@ function parseCSVText(text) {
 // ── CHARTS ────────────────────────────────────────────────────────────────
 function drawCharts(data) {
   if (!data.length) return;
-  Chart.defaults.color = '#a0a8c0';
-  Chart.defaults.borderColor = 'rgba(255,255,255,.06)';
-  Chart.defaults.font.family = 'JetBrains Mono';
 
   function mk(id, cfg) {
     if (myCharts[id]) myCharts[id].destroy();
