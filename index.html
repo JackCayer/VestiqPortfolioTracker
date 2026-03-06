@@ -1083,7 +1083,7 @@ var fmpKey       = localStorage.getItem('vq_fmpkey') || '';
 function anthropicUrl() {
   var worker = localStorage.getItem('vq_worker_url') || '';
   if (worker) return worker.replace(/\/$/, '') + '/anthropic/v1/messages';
-  return anthropicUrl();
+  return 'https://api.anthropic.com/v1/messages';
 }
 var firebaseConfig = null;
 var firebaseDB     = null;
