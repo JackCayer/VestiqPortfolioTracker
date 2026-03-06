@@ -1,0 +1,85 @@
+name: Daily Reports - Firebase Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-firebase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Firebase write
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          python3 << 'PYEOF'
+import json, os, urllib.request, re, datetime
+
+# Clean secrets
+def clean(v):
+    return re.sub(r'[\s\r\n]+', '', os.environ.get(v, ''))
+
+firebase_key     = clean('FIREBASE_API_KEY')
+firebase_project = clean('FIREBASE_PROJECT_ID')
+
+print(f'Project: {firebase_project!r} (len={len(firebase_project)})')
+print(f'Key prefix: {firebase_key[:8]!r} (len={len(firebase_key)})')
+
+base = (
+    'https://firestore.googleapis.com/v1/projects/'
+    + firebase_project
+    + '/databases/(default)/documents/vestiq/reports'
+)
+print(f'URL: {base!r}')
+
+# Dummy report
+now = datetime.datetime.utcnow().isoformat() + 'Z'
+dummy = {
+    '2026-01-01-test': {
+        'type': 'close',
+        'date': '2026-01-01',
+        'generatedAt': now,
+        'text': '## Test Report\n\nThis is a test. Firebase write is working.',
+        'portfolioValue': 0,
+        'dayPL': 0,
+        'totalReturn': 0,
+        'auto': True,
+        'source': 'github-actions-test'
+    }
+}
+
+# Step 1: read existing
+print('Reading existing doc...')
+try:
+    with urllib.request.urlopen(f'{base}?key={firebase_key}') as r:
+        existing = json.loads(r.read())
+    cache = json.loads(existing.get('fields', {}).get('cache', {}).get('stringValue', '{}'))
+    print(f'Existing keys: {list(cache.keys())}')
+except Exception as e:
+    print(f'No existing doc (ok): {e}')
+    cache = {}
+
+# Step 2: merge
+cache.update(dummy)
+
+# Step 3: write
+print('Writing to Firebase...')
+patch_url = f'{base}?key={firebase_key}&updateMask.fieldPaths=cache'
+print(f'PATCH URL: {patch_url!r}')
+
+payload = json.dumps({
+    'fields': {'cache': {'stringValue': json.dumps(cache)}}
+}).encode()
+
+req = urllib.request.Request(
+    patch_url,
+    data=payload,
+    method='PATCH',
+    headers={'Content-Type': 'application/json'}
+)
+with urllib.request.urlopen(req) as r:
+    result = json.loads(r.read())
+
+print('SUCCESS - Firebase write OK')
+print(f'Written key: 2026-01-01-test')
+PYEOF
