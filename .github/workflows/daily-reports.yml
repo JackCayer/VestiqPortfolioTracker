@@ -43,9 +43,9 @@ jobs:
           cat > /tmp/run_report.py << 'PYEOF'
           import json, os, urllib.request, datetime, sys
 
-          api_key          = os.environ['ANTHROPIC_API_KEY']
-          firebase_key     = os.environ['FIREBASE_API_KEY']
-          firebase_project = os.environ['FIREBASE_PROJECT_ID']
+          api_key          = os.environ['ANTHROPIC_API_KEY'].strip()
+          firebase_key     = os.environ['FIREBASE_API_KEY'].strip()
+          firebase_project = os.environ['FIREBASE_PROJECT_ID'].strip()
           report_type      = os.environ['REPORT_TYPE']
 
           now_et   = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=4)
