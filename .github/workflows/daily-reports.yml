@@ -43,10 +43,12 @@ jobs:
           cat > /tmp/run_report.py << 'PYEOF'
           import json, os, urllib.request, datetime, sys
 
-          api_key          = os.environ['ANTHROPIC_API_KEY'].strip()
-          firebase_key     = os.environ['FIREBASE_API_KEY'].strip()
-          firebase_project = os.environ['FIREBASE_PROJECT_ID'].strip()
-          report_type      = os.environ['REPORT_TYPE']
+          import re as _re
+          def _clean(v): return _re.sub(r'[\s\r\n]+', '', os.environ.get(v, ''))
+          api_key          = _clean('ANTHROPIC_API_KEY')
+          firebase_key     = _clean('FIREBASE_API_KEY')
+          firebase_project = _clean('FIREBASE_PROJECT_ID')
+          report_type      = os.environ['REPORT_TYPE'].strip()
 
           now_et   = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=4)
           date_str = now_et.strftime('%Y-%m-%d')
@@ -54,6 +56,8 @@ jobs:
           day_name = now_et.strftime('%A, %B %-d, %Y')
 
           print(f'Generating {report_type} report for {date_str}')
+          print(f'Firebase project: {firebase_project!r} (len={len(firebase_project)})')
+          print(f'Firebase key starts: {firebase_key[:8]!r}')
 
           ctx = ("The investor holds TSX-listed Canadian stocks: banks (RY,TD,BNS,BMO,CM,NA), "
                  "energy (ENB,TRP,PPL,SU,CNQ), utilities (FTS,AQN,CPX), "
