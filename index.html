@@ -1079,6 +1079,12 @@ var sortDir = -1; // -1 = descending, 1 = ascending
 var hideAmounts = false;
 var anthropicKey = localStorage.getItem('vq_apikey') || '';
 var fmpKey       = localStorage.getItem('vq_fmpkey') || '';
+
+function anthropicUrl() {
+  var worker = localStorage.getItem('vq_worker_url') || '';
+  if (worker) return worker.replace(/\/$/, '') + '/anthropic/v1/messages';
+  return anthropicUrl();
+}
 var firebaseConfig = null;
 var firebaseDB     = null;
 var firebaseUID    = 'main'; // fixed doc ID - same on all devices
@@ -1912,7 +1918,7 @@ async function sendAI() {
       box.scrollTop = box.scrollHeight;
       return;
     }
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch(anthropicUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
       body: JSON.stringify({
@@ -3425,7 +3431,7 @@ async function generateReport(type, auto) {
     var prompt   = buildReportPrompt(type, enriched);
     var isPremarket = type === 'premarket';
 
-    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+    var resp = await fetch(anthropicUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
