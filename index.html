@@ -983,6 +983,16 @@ canvas + * { color: #e8eaf0 !important; }
     <input id="keyInput" class="ifield" type="password" placeholder="sk-ant-api03-..." style="margin-bottom:20px;font-family:var(--fm)"/>
 
     <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:700;color:#4af0c8;margin-bottom:6px">⚡ Cloudflare Worker URL <span style="font-size:11px;font-weight:400;color:var(--muted)">(optional — fixes proxy issues)</span></div>
+      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.6;margin-bottom:10px">
+        Deploy the included <code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px">vestiq-proxy-worker.js</code> to Cloudflare Workers (free tier) for reliable price data. Paste your worker URL below.
+      </p>
+      <div class="flbl" style="margin-bottom:6px">Worker URL</div>
+      <input id="workerUrlInput" class="ifield" placeholder="https://vestiq-proxy.yourname.workers.dev" style="font-family:var(--fm);margin-bottom:4px"/>
+      <div id="worker-status" style="font-size:11px;color:var(--muted);font-family:var(--fm);margin-bottom:4px"></div>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:16px">
       <div style="font-size:14px;font-weight:700;color:var(--accent2);margin-bottom:6px">📊 Financial Modeling Prep (FMP)</div>
       <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.6;margin-bottom:12px">
         Required for the Stock Screener. Get a free key (250 calls/day) at
@@ -1409,6 +1419,10 @@ function showKeyModal() {
   modal.style.display = 'flex';
   document.getElementById('keyInput').value = anthropicKey;
   document.getElementById('fmpKeyInput').value = fmpKey;
+  var wu = document.getElementById('workerUrlInput');
+  if (wu) wu.value = localStorage.getItem('vq_worker_url') || '';
+  var ws = document.getElementById('worker-status');
+  if (ws) ws.textContent = localStorage.getItem('vq_worker_url') ? '✅ Worker configured' : 'Not configured — using public proxies';
   document.getElementById('keyStatus').textContent = anthropicKey ? '✅ Anthropic key saved' + (fmpKey ? ' · FMP key saved' : '') : '';
   document.getElementById('keyStatus').style.color = 'var(--green)';
 }
@@ -1435,6 +1449,11 @@ function saveKey() {
     fmpKey = fmpRaw;
     localStorage.setItem('vq_fmpkey', fmpRaw);
     msgs.push('FMP key saved');
+  }
+  var workerRaw = document.getElementById('workerUrlInput') && document.getElementById('workerUrlInput').value.trim();
+  if (workerRaw) {
+    localStorage.setItem('vq_worker_url', workerRaw);
+    msgs.push('Worker URL saved');
   }
   if (!msgs.length) { status.textContent = 'No keys entered'; status.style.color = 'var(--muted)'; return; }
   status.textContent = '✅ ' + msgs.join(' · ');
@@ -1599,44 +1618,53 @@ function clearAll() {
 // ── PROXY HELPER ─────────────────────────────────────────────────────────────
 // Tries multiple CORS proxies in order until one works
 async function fetchViaProxy(targetUrl) {
-  var proxies = [
+  // Try Cloudflare Worker first if configured
+  var workerUrl = localStorage.getItem('vq_worker_url') || '';
+
+  var proxies = [];
+
+  // Always try worker first if set
+  if (workerUrl) {
+    proxies.push(function(u) { return workerUrl + '?url=' + encodeURIComponent(u); });
+  }
+
+  // Public proxies as fallback
+  proxies = proxies.concat([
     function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); },
-    function(u) { return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); },
     function(u) { return 'https://api.allorigins.win/get?url=' + encodeURIComponent(u); },
+    function(u) { return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); },
     function(u) { return 'https://thingproxy.freeboard.io/fetch/' + u; },
     function(u) { return 'https://corsproxy.org/?' + encodeURIComponent(u); },
     function(u) { return 'https://proxy.cors.sh/' + u; },
     function(u) { return 'https://yacdn.org/proxy/' + u; },
-  ];
+    function(u) { return 'https://cors-anywhere.herokuapp.com/' + u; },
+  ]);
 
   for (var i = 0; i < proxies.length; i++) {
     try {
       var proxyUrl = proxies[i](targetUrl);
       var resp = await fetch(proxyUrl, {
-        signal: AbortSignal.timeout(6000),
-        headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }
+        signal: AbortSignal.timeout(7000),
+        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
       });
       if (!resp.ok) continue;
       var text = await resp.text();
       if (!text || text.trim() === '') continue;
       // Handle allorigins-style JSON wrapper
       if (text.trim().startsWith('{') && text.indexOf('"contents"') > -1) {
-        var json = JSON.parse(text);
-        text = json.contents || '';
+        var wrapper = JSON.parse(text);
+        text = wrapper.contents || '';
       }
-      // Decode base64 data URI
       if (text.indexOf('base64,') > -1) {
         try { text = atob(text.split('base64,')[1]); } catch(e) {}
       }
-      if (text && text.trim() !== '') {
-        console.log('Proxy ' + i + ' succeeded for: ' + targetUrl.substring(0, 60));
-        return text;
-      }
+      if (text && text.trim() !== '') return text;
     } catch(e) {
-      console.log('Proxy ' + i + ' failed:', e.message);
+      // Suppress individual proxy failures from console — only log in debug mode
+      if (localStorage.getItem('vq_debug')) console.log('[proxy ' + i + ' failed]', e.message);
     }
   }
-  console.error('All proxies failed for:', targetUrl);
+  console.warn('[Vestiq] All proxies failed — prices unavailable. Deploy a Cloudflare Worker for reliable data.');
   return null;
 }
 
