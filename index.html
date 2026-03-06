@@ -3431,9 +3431,18 @@ async function generateReport(type, auto) {
     var prompt   = buildReportPrompt(type, enriched);
     var isPremarket = type === 'premarket';
 
-    var resp = await fetch(anthropicUrl(), {
+    var apiUrl = anthropicUrl();
+    console.log('[REPORTS] Calling:', apiUrl);
+    console.log('[REPORTS] API key starts:', anthropicKey.substring(0, 12));
+
+    var resp = await fetch(apiUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
@@ -3442,6 +3451,7 @@ async function generateReport(type, auto) {
         messages: [{ role: 'user', content: prompt.user }]
       })
     });
+    console.log('[REPORTS] Response status:', resp.status);
 
     if (!resp.ok) throw new Error('API error ' + resp.status);
     var data = await resp.json();
