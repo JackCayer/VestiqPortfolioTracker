@@ -5188,17 +5188,18 @@ function renderAllocation() {
               label: 'Your Portfolio (Total Return %)',
               data: portPcts,
               borderColor: '#c8f04a',
-              backgroundColor: 'rgba(200,240,74,.08)',
-              tension: 0.3, pointRadius: 4, fill: true,
+              backgroundColor: 'rgba(200,240,74,.06)',
+              tension: 0.3, fill: true, borderWidth: 2.5,
               pointBackgroundColor: portPcts.map(function(_,i){ return sourceLabels[i]==='real' ? '#c8f04a' : 'rgba(200,240,74,.4)'; }),
-              pointRadius: portPcts.map(function(_,i){ return sourceLabels[i]==='real' ? 5 : 3; })
+              pointRadius: portPcts.map(function(_,i){ return sourceLabels[i]==='real' ? 2 : 1; }),
+              pointHoverRadius: 5
             },
           ].concat([
-              { ticker:'XIC.TO', label:'XIC (TSX)',        color:'#4af0c8' },
-              { ticker:'XIU.TO', label:'XIU (TSX 60)',     color:'#4a8af0' },
-              { ticker:'SPY',    label:'SPY (S&P 500)',    color:'#f0c84a' },
-              { ticker:'QQQ',    label:'QQQ (Nasdaq 100)', color:'#f04a8a' },
-              { ticker:'XRE.TO', label:'XRE (CDN REIT)',   color:'#a78bfa' },
+              { ticker:'XIC.TO', label:'XIC (TSX)',        color:'#4af0c8', dash:[6,3] },
+              { ticker:'XIU.TO', label:'XIU (TSX 60)',     color:'#4a8af0', dash:[4,4] },
+              { ticker:'SPY',    label:'SPY (S&P 500)',    color:'#f0c84a', dash:[8,3] },
+              { ticker:'QQQ',    label:'QQQ (Nasdaq 100)', color:'#f04a8a', dash:[3,3] },
+              { ticker:'XRE.TO', label:'XRE (CDN REIT)',   color:'#a78bfa', dash:[6,2,2,2] },
             ].map(function(b) {
               var base = null;
               var bPcts = validLabels.map(function(month) {
@@ -5208,7 +5209,8 @@ function renderAllocation() {
                 return +((px - base) / base * 100).toFixed(2);
               });
               return { label: b.label, data: bPcts, borderColor: b.color,
-                backgroundColor: 'transparent', tension: 0.3, pointRadius: 2, fill: false, borderWidth: 1.5 };
+                backgroundColor: 'transparent', tension: 0.3, pointRadius: 0,
+                pointHoverRadius: 4, fill: false, borderWidth: 1, borderDash: b.dash };
             }))
         },
         options: {
