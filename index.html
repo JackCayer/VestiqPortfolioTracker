@@ -166,7 +166,6 @@ canvas + * { color: #e8eaf0 !important; }
   <button class="ntab"     id="tab-search"    onclick="showTab('search')">🔍 Research</button>
   <button class="ntab"     id="tab-watchlist" onclick="showTab('watchlist')">👁 Watchlist</button>
   <button class="ntab"     id="tab-reports"   onclick="showTab('reports')">📋 Daily Reports</button>
-  <button class="ntab"     id="tab-reports"   onclick="showTab('reports')">📋 Daily Reports</button>
 </nav>
 
 <main>
@@ -3100,111 +3099,6 @@ async function checkAutoReport() {
   } catch(e) { console.log('[REPORTS] Auto-check failed', e); }
 }
 
-async function generateReport(type, silent) {
-  if (!anthropicKey) {
-    showToast('⚠️ Add your Anthropic API key in ⚙️ Settings first', true);
-    return;
-  }
-  if (!firebaseDB) {
-    showToast('⚠️ Connect Firebase first to save reports', true);
-    return;
-  }
-
-  var bodyEl = document.getElementById('rpt-' + type + '-body');
-  var timeEl = document.getElementById('rpt-' + type + '-time');
-  if (bodyEl) bodyEl.innerHTML = '<span style="color:var(--muted)">⏳ Generating report…</span>';
-  if (!silent) showToast('⏳ Generating ' + (type === 'premarket' ? 'pre-market' : 'close') + ' report…');
-
-  // Build portfolio snapshot for context
-  var data = enrich();
-  var totalValue = data.reduce(function(s,h){ return s+h.mktValue; }, 0);
-  var totalContrib = contributions.reduce(function(s,c){ return s+c.amount; }, 0);
-  var topHoldings = data.slice().sort(function(a,b){ return b.mktValue-a.mktValue; }).slice(0,8)
-    .map(function(h){ return h.ticker + ' ($' + h.mktValue.toFixed(0) + ', ' + (h.mktValue/totalValue*100).toFixed(1) + '%, day: ' + (h.changePct||0).toFixed(2) + '%)'; }).join(', ');
-  var tickers = data.map(function(h){ return h.ticker; }).join(', ');
-  var today = new Date().toISOString().substr(0,10);
-
-  var systemPrompt = type === 'premarket'
-    ? 'You are a personal portfolio analyst. Generate a concise, actionable pre-market briefing for a Canadian retail investor. Use ▲ for positive and ▼ for negative movements. Use ** for bold. Format with ## section headers. Be direct and specific — no fluff.'
-    : 'You are a personal portfolio analyst. Generate a concise end-of-day portfolio summary for a Canadian retail investor. Use ▲ for positive and ▼ for negative movements. Use ** for bold. Format with ## section headers. Highlight notable moves and what to watch tomorrow. Be direct and specific.';
-
-  var prePrompt =
-    'Generate a pre-market briefing for ' + today + '.\n\n' +
-    'My portfolio: ' + tickers + '\n' +
-    'Top holdings: ' + topHoldings + '\n' +
-    'Total value: $' + totalValue.toFixed(0) + ' CAD\n\n' +
-    'Include:\n## Overnight & Pre-Market\nKey overnight moves affecting my holdings or sectors\n\n' +
-    '## Macro Watch\nKey economic events, earnings, or Fed/BOC news today\n\n' +
-    '## My Portfolio Today\nWhat to watch for each major holding today\n\n' +
-    '## Key Levels\nAny important technical or news levels to watch\n\n' +
-    'Keep each section to 3-5 bullet points. Be specific with numbers where possible.';
-
-  var closePrompt =
-    'Generate a market close report for ' + today + '.\n\n' +
-    'My portfolio: ' + tickers + '\n' +
-    'Top holdings by value: ' + topHoldings + '\n' +
-    'Total portfolio value: $' + totalValue.toFixed(0) + ' CAD\n' +
-    'Total contributions: $' + totalContrib.toFixed(0) + ' CAD\n\n' +
-    'Include:\n## Portfolio Performance Today\nHow my specific holdings did today\n\n' +
-    '## Market Summary\nHow the TSX, S&P 500, and key sectors closed\n\n' +
-    '## Notable Moves\nAnything notable that moved my holdings today\n\n' +
-    "## Tomorrow's Watch List\nKey events, earnings, or levels to watch tomorrow\n\n" +
-    'Keep each section to 3-5 bullet points. Be specific with numbers where possible.';
-
-  var userPrompt = type === 'premarket' ? prePrompt : closePrompt;
-
-  try {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }]
-      })
-    });
-
-    var result = await response.json();
-    var content = result.content
-      .filter(function(b){ return b.type === 'text'; })
-      .map(function(b){ return b.text; })
-      .join('\n');
-
-    if (!content) throw new Error('Empty response');
-
-    var now = new Date();
-    var generatedAt = now.toLocaleString('en-CA', { timeZone:'America/Toronto', hour:'2-digit', minute:'2-digit', month:'short', day:'numeric' });
-
-    var report = { date: today, type: type, content: content, generatedAt: generatedAt };
-
-    // Save to Firebase
-    var doc = await firebaseDB.collection('vestiq').doc('reports').get();
-    var all = doc.exists ? JSON.parse(doc.data().reports || '[]') : [];
-    // Remove old report of same type+date if exists
-    all = all.filter(function(r){ return !(r.date === today && r.type === type); });
-    all.push(report);
-    // Keep last 60 reports
-    if (all.length > 60) all = all.slice(all.length - 60);
-    await firebaseDB.collection('vestiq').doc('reports').set({ reports: JSON.stringify(all) });
-
-    if (bodyEl) bodyEl.innerHTML = formatReportBody(content);
-    if (timeEl) timeEl.textContent = generatedAt;
-    if (!silent) showToast('✅ Report generated');
-    renderRptHistory(all);
-
-  } catch(e) {
-    if (bodyEl) bodyEl.innerHTML = '<span style="color:var(--red)">⚠️ Failed: ' + e.message + '</span>';
-    if (!silent) showToast('⚠️ Report failed: ' + e.message, true);
-    console.error('[REPORTS]', e);
-  }
-}
 
 // ══════════════════════════════════════════════════════════════
 // DAILY REPORTS
@@ -3456,7 +3350,15 @@ function updateNextReportInfo() {
 }
 
 function autoGenerateIfDue() {
-  if (!anthropicKey) return; // silently skip — no key set
+  if (!anthropicKey) return;
+  // Wait for prices to load — check if any holding has a price
+  var enriched = [];
+  try { enriched = enrich(); } catch(e) {}
+  var pricesLoaded = enriched.length > 0 && enriched.some(function(h){ return h.price > 0; });
+  if (!pricesLoaded) {
+    console.log('[REPORTS] Prices not loaded yet, skipping auto-generate');
+    return;
+  }
   var now   = getETNow();
   var today = todayET();
   if (!isWeekday(now)) return;
@@ -3537,7 +3439,8 @@ async function generateReport(type, auto) {
     showToast('✅ ' + (isPremarket ? 'Pre-market' : 'Close') + ' report generated');
 
   } catch(e) {
-    showToast('⚠️ Report failed: ' + e.message, true);
+    // Only show toast for manual triggers, not background auto-generates
+    if (!auto) showToast('⚠️ Report failed: ' + e.message, true);
     console.error('[REPORTS]', e);
   } finally {
     if (btn) { btn.textContent = isPremarket ? '⚡ Pre-Market Now' : '⚡ Close Report Now'; btn.disabled = false; }
