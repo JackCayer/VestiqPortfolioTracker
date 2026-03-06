@@ -1,0 +1,150 @@
+name: Daily Portfolio Reports
+
+on:
+  schedule:
+    - cron: '0 13 * * 1-5'   # 9:00 AM ET (EDT), Mon-Fri
+    - cron: '0 20 * * 1-5'   # 4:00 PM ET (EDT), Mon-Fri
+  workflow_dispatch:
+    inputs:
+      report_type:
+        description: 'Which report to generate'
+        required: true
+        default: 'close'
+        type: choice
+        options:
+          - premarket
+          - close
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine report type
+        id: rtype
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ github.event.inputs.report_type }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(date -u +%H)
+            if [ "$HOUR" = "13" ]; then
+              echo "type=premarket" >> $GITHUB_OUTPUT
+            else
+              echo "type=close" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Generate and save report
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          REPORT_TYPE: ${{ steps.rtype.outputs.type }}
+        run: |
+          cat > /tmp/run_report.py << 'PYEOF'
+          import json, os, urllib.request, datetime, sys
+
+          api_key          = os.environ['ANTHROPIC_API_KEY']
+          firebase_key     = os.environ['FIREBASE_API_KEY']
+          firebase_project = os.environ['FIREBASE_PROJECT_ID']
+          report_type      = os.environ['REPORT_TYPE']
+
+          now_et   = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=4)
+          date_str = now_et.strftime('%Y-%m-%d')
+          dt_str   = now_et.strftime('%Y-%m-%dT%H:%M:%S-04:00')
+          day_name = now_et.strftime('%A, %B %-d, %Y')
+
+          print(f'Generating {report_type} report for {date_str}')
+
+          ctx = ("The investor holds TSX-listed Canadian stocks: banks (RY,TD,BNS,BMO,CM,NA), "
+                 "energy (ENB,TRP,PPL,SU,CNQ), utilities (FTS,AQN,CPX), "
+                 "gold miners (XGD ETF), broad TSX (XIU,XIC ETFs).")
+
+          if report_type == 'premarket':
+              system = ("You are a professional portfolio analyst writing a pre-market briefing "
+                        "for a Canadian retail investor. Be concise, factual, actionable. "
+                        "Use markdown headers. Search the web for current data.")
+              user = f"""## Pre-Market Briefing — {day_name}
+          {ctx}
+          Include sections:
+          1. **Market Overnight** — US futures, Asian/European closes, CAD/USD, gold, oil
+          2. **Today's Key Events** — economic releases, earnings, BoC/Fed events
+          3. **Canadian Market Outlook** — TSX sector themes for today
+          4. **Holdings Watch** — news/catalysts for Canadian banks, energy, utilities, gold
+          5. **Pre-Market Movers** — notable US pre-market activity
+          6. **Key Levels** — TSX Composite and S&P 500 levels to watch
+          7. **Action Items** — what to monitor during the session"""
+          else:
+              system = ("You are a professional portfolio analyst writing an end-of-day recap "
+                        "for a Canadian retail investor. Be concise, factual, forward-looking. "
+                        "Use markdown headers. Search for today's closing data.")
+              user = f"""## End-of-Day Report — {day_name}
+          {ctx}
+          Include sections:
+          1. **Market Summary** — TSX, S&P 500, Nasdaq closing levels and % change
+          2. **Canadian Dollar** — CAD/USD close and drivers
+          3. **Sector Recap** — financials, energy, utilities, gold performance today
+          4. **Commodities** — gold, oil WTI, natural gas closes
+          5. **Key News** — major stories that moved Canadian markets
+          6. **Dividend Watch** — dividend announcements from major Canadian companies
+          7. **Tomorrow's Watch List** — events and earnings to monitor
+          8. **Weekly Recap** — only if today is Friday"""
+
+          payload = json.dumps({
+              "model": "claude-sonnet-4-20250514",
+              "max_tokens": 2000,
+              "system": system,
+              "tools": [{"type": "web_search_20250305", "name": "web_search"}],
+              "messages": [{"role": "user", "content": user}]
+          }).encode()
+
+          req = urllib.request.Request(
+              'https://api.anthropic.com/v1/messages',
+              data=payload,
+              headers={
+                  'Content-Type': 'application/json',
+                  'x-api-key': api_key,
+                  'anthropic-version': '2023-06-01'
+              }
+          )
+          with urllib.request.urlopen(req) as resp:
+              data = json.loads(resp.read())
+
+          report_text = '\n'.join(
+              b['text'] for b in data.get('content', []) if b.get('type') == 'text'
+          )
+          if not report_text:
+              print('ERROR: empty report'); print(str(data)[:500]); sys.exit(1)
+          print(f'Generated {len(report_text)} chars')
+
+          report_key = f'{date_str}-{report_type}'
+          new_report = {
+              'type': report_type, 'date': date_str, 'generatedAt': dt_str,
+              'text': report_text, 'portfolioValue': 0, 'dayPL': 0,
+              'totalReturn': 0, 'auto': True, 'source': 'github-actions'
+          }
+
+          base = f'https://firestore.googleapis.com/v1/projects/{firebase_project}/databases/(default)/documents/vestiq/reports'
+          try:
+              with urllib.request.urlopen(f'{base}?key={firebase_key}') as r:
+                  existing = json.loads(r.read())
+              cache = json.loads(existing.get('fields',{}).get('cache',{}).get('stringValue','{}'))
+          except Exception as e:
+              print(f'Fresh cache ({e})'); cache = {}
+
+          cache[report_key] = new_report
+          trimmed = dict(sorted(cache.items(), reverse=True)[:30])
+
+          patch = json.dumps({'fields':{'cache':{'stringValue':json.dumps(trimmed)}}}).encode()
+          req2 = urllib.request.Request(
+              f'{base}?key={firebase_key}&updateMask.fieldPaths=cache',
+              data=patch, method='PATCH',
+              headers={'Content-Type':'application/json'}
+          )
+          with urllib.request.urlopen(req2) as r:
+              json.loads(r.read())
+          print(f'Saved: {report_key}')
+          PYEOF
+          python3 /tmp/run_report.py
+
+      - name: Done
+        run: echo "Done. Type=${{ steps.rtype.outputs.type }} at $(TZ='America/New_York' date)"
