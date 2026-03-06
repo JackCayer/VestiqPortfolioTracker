@@ -3456,7 +3456,7 @@ function updateNextReportInfo() {
 }
 
 function autoGenerateIfDue() {
-  if (!anthropicKey) return;
+  if (!anthropicKey) return; // silently skip — no key set
   var now   = getETNow();
   var today = todayET();
   if (!isWeekday(now)) return;
@@ -3611,16 +3611,13 @@ function renderMarkdown(md, targetId) {
   el.innerHTML = html;
 }
 
-// Check auto-generate every minute while app is open
+// Check auto-generate every minute while app is open — only if key is set
 setInterval(function() {
-  if (document.getElementById('pane-reports') &&
-      document.getElementById('pane-reports').classList.contains('active')) {
-    updateNextReportInfo();
-    autoGenerateIfDue();
-  } else {
-    // Still check even if tab not open
-    autoGenerateIfDue();
-  }
+  if (!anthropicKey) return; // no key, nothing to do
+  var pane = document.getElementById('pane-reports');
+  var isActive = pane && pane.classList.contains('active');
+  if (isActive) updateNextReportInfo();
+  autoGenerateIfDue();
 }, 60000);
 
 // ══════════════════════════════════════════════════════════════
