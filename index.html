@@ -376,6 +376,7 @@ canvas + *{color:#e8eaf0 !important}
 <!-- ══ DESKTOP TOP BAR ══════════════════════════════════════════ -->
 <div id="desktop-header">
   <span id="lastUpdated" style="font-size:11px;color:var(--muted);font-family:var(--fm)"></span>
+  <button onclick="manualRefresh()" id="refreshBtn" title="Refresh prices" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:14px;color:var(--muted);transition:all .2s;line-height:1" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">🔄</button>
 </div>
 
 <!-- ══ MOBILE TOP BAR ══════════════════════════════════════════ -->
@@ -392,6 +393,7 @@ canvas + *{color:#e8eaf0 !important}
     <button onclick="showKeyModal()" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;font-size:13px;color:var(--muted)">⚙️</button>
     <button id="eyeBtn2" onclick="toggleHide()" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;font-size:13px;color:var(--muted)">👁</button>
     <button onclick="showFBModal()" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;font-size:13px;color:var(--muted)">☁️</button>
+    <button onclick="manualRefresh()" id="refreshBtn2" title="Refresh prices" style="background:transparent;border:1px solid var(--border);border-radius:7px;padding:5px 8px;cursor:pointer;font-size:13px;color:var(--muted)">🔄</button>
   </div>
 </div>
 
@@ -1515,10 +1517,20 @@ async function fetchPrices() {
   for (var i = 0; i < tickers.length; i++) {
     var t = tickers[i];
     // Use correct Yahoo suffix: .TO for TSX, .V for TSXV, nothing for US
-    var isTSX    = TSX_TICKERS.indexOf(t) > -1;
-    var isTSXV   = TSXV_TICKERS.indexOf(t) > -1;
-    var isTSX    = isTSX || isTSXV; // both are CAD — no FX conversion needed
-    var yahooTicker = isTSXV ? t + '.V' : isTSX ? t + '.TO' : t;
+    // If ticker already has exchange suffix, use it directly
+    var yahooTicker, isTSX;
+    if (t.endsWith('.TO') || t.endsWith('.to')) {
+      yahooTicker = t.toUpperCase();
+      isTSX = true;
+    } else if (t.endsWith('.V') || t.endsWith('.v')) {
+      yahooTicker = t.toUpperCase();
+      isTSX = true;
+    } else {
+      var isTSXList  = TSX_TICKERS.indexOf(t) > -1;
+      var isTSXVList = TSXV_TICKERS.indexOf(t) > -1;
+      isTSX = isTSXList || isTSXVList;
+      yahooTicker = isTSXVList ? t + '.V' : isTSXList ? t + '.TO' : t;
+    }
     try {
       var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + yahooTicker + '?interval=1d&range=1d';
       var raw2  = await fetchWithRetry(yahooUrl, 2);
@@ -3734,17 +3746,19 @@ var SCREENER_UNIVERSE = {
 };
 
 var SECTOR_MAP = {
-  'Financial Services': ['RY','TD','BNS','BMO','CM','NA','MFC','SLF','GWO','POW','IGM','IFC','JPM','BAC','WFC','GS','MS','BLK','C','USB'],
-  'Energy':             ['ENB','TRP','PPL','CNQ','SU','CVE','XOM','CVX','COP','SLB','EOG','PXD','MPC','VLO','PSX','BTE'],
-  'Technology':         ['SHOP','CSU','KXS','AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','ADBE','CSCO','INTC','AMD','QCOM'],
+  'Financial Services': ['RY','TD','BNS','BMO','CM','NA','MFC','SLF','GWO','POW','IGM','IFC','JPM','BAC','WFC','GS','MS','BLK','C','USB','PRG'],
+  'Energy':             ['ENB','TRP','PPL','CNQ','SU','CVE','XOM','CVX','COP','SLB','EOG','PXD','MPC','VLO','PSX','BTE','TNK'],
+  'Technology':         ['SHOP','CSU','KXS','AAPL','MSFT','GOOGL','AMZN','NVDA','META','TSLA','AVGO','ADBE','CSCO','INTC','AMD','QCOM','ITRN'],
   'Utilities':          ['AQN','FTS','EMA','H','CPX','NEE','DUK','SO','D','AEP','SRE','XEL','ED'],
-  'Industrials':        ['CNR','CP','CAE','MG','GE','CAT','DE','BA','HON','MMM','RTX','LMT'],
+  'Industrials':        ['CNR','CP','CAE','MG','GE','CAT','DE','BA','HON','MMM','RTX','LMT','GSL'],
   'Consumer Defensive': ['L','WN','MRU','DOL','EMP','WMT','PG','KO','PEP','MCD','COST'],
-  'Consumer Cyclical':  ['ATD','CTC','NKE','HD','TGT','LOW','SBUX','AMZN','TSLA'],
-  'Basic Materials':    ['ABX','AEM','WPM','FM','TECK','CCO','NTR'],
+  'Consumer Cyclical':  ['ATD','CTC','NKE','HD','TGT','LOW','SBUX','AMZN','TSLA','BBW'],
+  'Basic Materials':    ['ABX','AEM','WPM','FM','TECK','CCO','NTR','SVR'],
+  'Precious Metals':    ['XGD','ABX','AEM','WPM','OSK','OR','NGT','EDV','SSL'],
   'Healthcare':         ['JNJ','PFE','UNH','ABT','MRK','BMY','LLY','ABBV','TMO','DHR','AMGN','GILD'],
   'Real Estate':        ['BAM','BIP','BEP','AMT','PLD','CCI','EQIX','SPG','PSA','O'],
-  'Communication Services': ['GOOGL','META','NFLX','CSCO','T','VZ'],
+  'Communication Services': ['GOOGL','META','NFLX','CSCO','T','VZ','BCE'],
+  'Speculative':        ['FO'],
 };
 
 var SCREENER_PRESETS = {
@@ -5581,6 +5595,20 @@ function syncMobileFxRate() {
   if (src && dest) dest.textContent = src.textContent;
 }
 setInterval(syncMobileFxRate, 5000);
+
+
+function manualRefresh() {
+  var btn  = document.getElementById('refreshBtn');
+  var btn2 = document.getElementById('refreshBtn2');
+  var spin = function(b){ if(b){ b.textContent = '⏳'; b.style.opacity = '0.5'; b.disabled = true; } };
+  var reset = function(b){ if(b){ b.textContent = '🔄'; b.style.opacity = '1'; b.disabled = false; } };
+  spin(btn); spin(btn2);
+  fetchPrices().then(function(){
+    reset(btn); reset(btn2);
+  }).catch(function(){
+    reset(btn); reset(btn2);
+  });
+}
 
 </script>
 <!-- Edit Transaction Modal -->
