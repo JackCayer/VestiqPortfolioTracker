@@ -809,9 +809,8 @@ canvas + * { color: #e8eaf0 !important; }
       <div class="ctitle" style="margin:0">📋 Daily Reports</div>
       <div id="rpt-next-info" style="font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--fm)"></div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-a" id="rpt-premarket-btn" onclick="generateReport('premarket')" style="font-size:12px;padding:8px 16px">⚡ Pre-Market Now</button>
-      <button class="btn btn-a" id="rpt-close-btn"    onclick="generateReport('close')"    style="font-size:12px;padding:8px 16px">⚡ Close Report Now</button>
+    <div style="font-size:11px;color:var(--muted);font-family:var(--fm);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:7px 14px">
+      ⏰ Reports generated automatically via GitHub Actions at <strong style="color:var(--accent)">9:00 AM</strong> and <strong style="color:var(--accent)">4:00 PM ET</strong> on weekdays
     </div>
   </div>
 
@@ -888,7 +887,7 @@ canvas + * { color: #e8eaf0 !important; }
     <div style="text-align:center;padding:60px 20px;color:var(--muted)">
       <div style="font-size:32px;margin-bottom:12px">📋</div>
       <div style="font-size:14px">No reports yet.</div>
-      <div style="font-size:12px;margin-top:6px">Reports generate automatically at 9:00 AM and 4:00 PM ET when you have the app open,<br>or via GitHub Actions on schedule. Click a button above to generate one now.</div>
+      <div style="font-size:12px;margin-top:6px">Reports are generated automatically via GitHub Actions at 9:00 AM and 4:00 PM ET on weekdays and saved here.</div>
     </div>
   </div>
 
@@ -3107,31 +3106,6 @@ function updateNextRunDisplay() {
   }
 }
 
-async function checkAutoReport() {
-  if (!firebaseDB || !anthropicKey) return;
-  var now = new Date();
-  var etOffset = now.getTimezoneOffset() + 300; // to EST
-  var et = new Date(now.getTime() - etOffset * 60000);
-  var h = et.getHours();
-  var isWeekday = et.getDay() >= 1 && et.getDay() <= 5;
-  if (!isWeekday) return;
-  var today = et.toISOString().substr(0, 10);
-
-  try {
-    var doc = await firebaseDB.collection('vestiq').doc('reports').get();
-    var all = doc.exists ? JSON.parse(doc.data().reports || '[]') : [];
-    var hasPre   = all.some(function(r){ return r.date === today && r.type === 'premarket'; });
-    var hasClose = all.some(function(r){ return r.date === today && r.type === 'close'; });
-    // Auto-generate if missed and within catchup window
-    if (!hasPre && h >= 9 && h < 12) {
-      console.log('[REPORTS] Auto-generating missed pre-market report');
-      await generateReport('premarket', true);
-    } else if (!hasClose && h >= 16 && h < 20) {
-      console.log('[REPORTS] Auto-generating missed close report');
-      await generateReport('close', true);
-    }
-  } catch(e) { console.log('[REPORTS] Auto-check failed', e); }
-}
 
 
 // ══════════════════════════════════════════════════════════════
@@ -3360,7 +3334,6 @@ async function initReports() {
   await loadReportCache();
   renderReportList();
   updateNextReportInfo();
-  autoGenerateIfDue();
 }
 
 function updateNextReportInfo() {
@@ -3383,113 +3356,7 @@ function updateNextReportInfo() {
   }
 }
 
-function autoGenerateIfDue() {
-  if (!anthropicKey) return;
-  // Wait for prices to load — check if any holding has a price
-  var enriched = [];
-  try { enriched = enrich(); } catch(e) {}
-  var pricesLoaded = enriched.length > 0 && enriched.some(function(h){ return h.price > 0; });
-  if (!pricesLoaded) {
-    console.log('[REPORTS] Prices not loaded yet, skipping auto-generate');
-    return;
-  }
-  var now   = getETNow();
-  var today = todayET();
-  if (!isWeekday(now)) return;
-  var h = now.getHours(), m = now.getMinutes();
-  var totalMins = h * 60 + m;
-  var preMins   = PREMARKET_ET.h    * 60 + PREMARKET_ET.m;
-  var closeMins = MARKET_CLOSE_ET.h * 60 + MARKET_CLOSE_ET.m;
-  var preKey    = formatReportKey(today, 'premarket');
-  var closeKey  = formatReportKey(today, 'close');
-  // Generate pre-market if it\'s past 9:00 AM and not done
-  if (totalMins >= preMins && !reportCache[preKey]) {
-    setTimeout(function(){ generateReport('premarket', true); }, 1500);
-    return;
-  }
-  // Generate close if it\'s past 4:00 PM and not done
-  if (totalMins >= closeMins && !reportCache[closeKey]) {
-    setTimeout(function(){ generateReport('close', true); }, 1500);
-  }
-}
 
-async function generateReport(type, auto) {
-  if (!anthropicKey) {
-    showToast('⚠️ Add your Anthropic API key in ⚙️ Settings first', true);
-    showKeyModal();
-    return;
-  }
-  var today  = todayET();
-  var key    = formatReportKey(today, type);
-  var btnId  = type === 'premarket' ? 'rpt-premarket-btn' : 'rpt-close-btn';
-  var btn    = document.getElementById(btnId);
-  if (btn) { btn.textContent = '⏳ Generating…'; btn.disabled = true; }
-  showToast(auto ? '⏰ Auto-generating ' + type + ' report…' : '⏳ Generating report…');
-
-  try {
-    var enriched = enrich();
-    var prompt   = buildReportPrompt(type, enriched);
-    var isPremarket = type === 'premarket';
-
-    var apiUrl = anthropicUrl();
-    console.log('[REPORTS] Calling:', apiUrl);
-    console.log('[REPORTS] API key starts:', anthropicKey.substring(0, 12));
-
-    var resp = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: prompt.system,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: [{ role: 'user', content: prompt.user }]
-      })
-    });
-    console.log('[REPORTS] Response status:', resp.status);
-
-    if (!resp.ok) throw new Error('API error ' + resp.status);
-    var data = await resp.json();
-
-    // Extract text from content blocks (may include tool_use/tool_result blocks)
-    var reportText = data.content
-      .filter(function(b){ return b.type === 'text'; })
-      .map(function(b){ return b.text; })
-      .join('\n');
-
-    if (!reportText) throw new Error('Empty response');
-
-    var report = {
-      type: type,
-      date: today,
-      generatedAt: new Date().toISOString(),
-      text: reportText,
-      portfolioValue: prompt.totalVal,
-      dayPL: prompt.dayPL,
-      totalReturn: prompt.totalReturn,
-      auto: !!auto,
-      settings: JSON.parse(JSON.stringify(rptSettings))
-    };
-
-    reportCache[key] = report;
-    await saveReportCache();
-    renderReportList();
-    showReport(key);
-    showToast('✅ ' + (isPremarket ? 'Pre-market' : 'Close') + ' report generated');
-
-  } catch(e) {
-    // Only show toast for manual triggers, not background auto-generates
-    if (!auto) showToast('⚠️ Report failed: ' + e.message, true);
-    console.error('[REPORTS]', e);
-  } finally {
-    if (btn) { btn.textContent = isPremarket ? '⚡ Pre-Market Now' : '⚡ Close Report Now'; btn.disabled = false; }
-  }
-}
 
 function renderReportList() {
   var sel = document.getElementById('rpt-selector');
@@ -3564,7 +3431,6 @@ setInterval(function() {
   var pane = document.getElementById('pane-reports');
   var isActive = pane && pane.classList.contains('active');
   if (isActive) updateNextReportInfo();
-  autoGenerateIfDue();
 }, 60000);
 
 // ══════════════════════════════════════════════════════════════
