@@ -165,6 +165,8 @@ canvas + * { color: #e8eaf0 !important; }
   <button class="ntab"     id="tab-market"    onclick="showTab('market')">🌍 Market</button>
   <button class="ntab"     id="tab-search"    onclick="showTab('search')">🔍 Research</button>
   <button class="ntab"     id="tab-watchlist" onclick="showTab('watchlist')">👁 Watchlist</button>
+  <button class="ntab"     id="tab-reports"   onclick="showTab('reports')">📋 Daily Reports</button>
+  <button class="ntab"     id="tab-reports"   onclick="showTab('reports')">📋 Daily Reports</button>
 </nav>
 
 <main>
@@ -800,6 +802,99 @@ canvas + * { color: #e8eaf0 !important; }
   <div id="wl-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px"></div>
 </div>
 
+<!-- ══════════════ DAILY REPORTS ══════════════ -->
+<div id="pane-reports" class="pane">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+    <div>
+      <div class="ctitle" style="margin:0">📋 Daily Reports</div>
+      <div id="rpt-next-info" style="font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--fm)"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-a" id="rpt-premarket-btn" onclick="generateReport('premarket')" style="font-size:12px;padding:8px 16px">⚡ Pre-Market Now</button>
+      <button class="btn btn-a" id="rpt-close-btn"    onclick="generateReport('close')"    style="font-size:12px;padding:8px 16px">⚡ Close Report Now</button>
+    </div>
+  </div>
+
+  <!-- Report Settings (collapsible) -->
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleRptSettings()">
+      <div style="font-size:13px;font-weight:700;color:var(--accent2)">⚙️ Report Settings</div>
+      <div id="rpt-settings-arrow" style="color:var(--muted);font-size:12px;transition:transform .2s">▼</div>
+    </div>
+    <div id="rpt-settings-body" style="display:none;margin-top:16px">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" class="two-col">
+        <div>
+          <div class="flbl" style="margin-bottom:6px">Analyst Focus</div>
+          <div style="display:flex;flex-direction:column;gap:6px" id="rpt-focus-options">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="rpt-focus-analysis" checked onchange="saveRptSettings()"> Explain <em>why</em> stocks moved (causes & catalysts)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="rpt-focus-suggestions" checked onchange="saveRptSettings()"> Actionable suggestions for my holdings
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="rpt-focus-macro" checked onchange="saveRptSettings()"> Macro context (interest rates, inflation, BoC/Fed)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="rpt-focus-dividends" checked onchange="saveRptSettings()"> Dividend & income focus for my holdings
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="rpt-focus-technical" onchange="saveRptSettings()"> Technical levels (support/resistance, moving averages)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+              <input type="checkbox" id="rpt-focus-sentiment" onchange="saveRptSettings()"> Market sentiment & investor psychology
+            </label>
+          </div>
+        </div>
+        <div>
+          <div class="flbl" style="margin-bottom:6px">Report Style</div>
+          <select id="rpt-style" class="ifield" style="font-size:12px;margin-bottom:12px" onchange="saveRptSettings()">
+            <option value="analytical">Analytical — deep explanations of why</option>
+            <option value="concise">Concise — bullet-point summary</option>
+            <option value="narrative">Narrative — story-like writeup</option>
+            <option value="advisor">Personal Advisor — talk to me directly</option>
+          </select>
+          <div class="flbl" style="margin-bottom:6px">Tone</div>
+          <select id="rpt-tone" class="ifield" style="font-size:12px" onchange="saveRptSettings()">
+            <option value="professional">Professional</option>
+            <option value="conversational">Conversational</option>
+            <option value="cautious">Cautious / risk-aware</option>
+            <option value="optimistic">Optimistic / opportunity-focused</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div class="flbl" style="margin-bottom:6px">Additional Custom Instructions</div>
+        <textarea id="rpt-custom-instructions" class="ifield" rows="4"
+          style="font-size:12px;font-family:var(--fm);resize:vertical;line-height:1.6"
+          placeholder="e.g. I'm a long-term dividend investor. I don't trade short term. Focus on whether my thesis for each holding is intact. Flag if any of my stocks cut or suspended their dividend. Mention CAD/USD impact on my US-listed holdings."
+          oninput="saveRptSettings()"></textarea>
+      </div>
+
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-b" onclick="resetRptSettings()" style="font-size:11px;padding:7px 14px">Reset to Defaults</button>
+        <div id="rpt-settings-saved" style="font-size:11px;color:var(--green);font-family:var(--fm)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report selector tabs -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px" id="rpt-selector"></div>
+
+  <!-- Active report display -->
+  <div id="rpt-display">
+    <div style="text-align:center;padding:60px 20px;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:12px">📋</div>
+      <div style="font-size:14px">No reports yet.</div>
+      <div style="font-size:12px;margin-top:6px">Reports generate automatically at 9:00 AM and 4:00 PM ET when you have the app open,<br>or via GitHub Actions on schedule. Click a button above to generate one now.</div>
+    </div>
+  </div>
+
+</div>
+
 <!-- ══════════════ CONTRIBUTIONS ══════════════ -->
 <div id="pane-contrib" class="pane">
   <div class="two-col" style="margin-bottom:18px">
@@ -963,6 +1058,8 @@ function showTab(name) {
   if (name === 'market') { setTimeout(function(){ renderMarket(); }, 100); }
   if (name === 'search') { initResearch(); updateScreenerKeyHint(); }
   if (name === 'watchlist') { renderWatchlist(); }
+  if (name === 'reports')   { initReports(); }
+  if (name === 'reports')   { renderReports(); checkAutoReport(); }
 }
 
 // ── PRICE FETCHING ────────────────────────────────────────────────────────
@@ -2833,6 +2930,698 @@ async function loadSnapshots() {
     return JSON.parse(snapDoc.data().daily || '{}');
   } catch(e) { return {}; }
 }
+
+// ══════════════════════════════════════════════════════════════
+// DAILY REPORTS
+// ══════════════════════════════════════════════════════════════
+var rptFilter = 'all';
+
+function setRptFilter(f) {
+  rptFilter = f;
+  ['all','premarket','close'].forEach(function(x) {
+    var b = document.getElementById('rhf-' + x);
+    if (b) b.classList.toggle('on', x === f);
+  });
+  renderRptHistory();
+}
+
+// Format report body — convert markdown-ish text to styled HTML
+function formatReportBody(text) {
+  if (!text) return '<span style="color:var(--muted)">No report available</span>';
+  return text
+    .replace(/^### (.+)$/gm, '<div style="font-size:12px;font-weight:700;color:var(--accent);margin:12px 0 4px;text-transform:uppercase;letter-spacing:.5px">$1</div>')
+    .replace(/^## (.+)$/gm,  '<div style="font-size:13px;font-weight:700;color:var(--accent2);margin:14px 0 6px">$1</div>')
+    .replace(/^# (.+)$/gm,   '<div style="font-size:15px;font-weight:800;color:var(--text);margin:0 0 10px">$1</div>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
+    .replace(/▲/g, '<span class="up">▲</span>')
+    .replace(/▼/g, '<span class="dn">▼</span>')
+    .replace(/\+([0-9.]+%)/g, '<span class="up">+$1</span>')
+    .replace(/(-[0-9.]+%)/g,  '<span class="dn">$1</span>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
+async function renderReports() {
+  if (!firebaseDB) {
+    document.getElementById('rpt-premarket-body').innerHTML =
+      '<span style="color:var(--muted)">Connect Firebase to load reports</span>';
+    document.getElementById('rpt-close-body').innerHTML =
+      '<span style="color:var(--muted)">Connect Firebase to load reports</span>';
+    return;
+  }
+
+  // Show next run time
+  updateNextRunDisplay();
+
+  var today = new Date().toISOString().substr(0, 10);
+
+  try {
+    var doc = await firebaseDB.collection('vestiq').doc('reports').get();
+    var all = doc.exists ? JSON.parse(doc.data().reports || '[]') : [];
+
+    // Today's reports
+    var todayPre   = all.find(function(r){ return r.date === today && r.type === 'premarket'; });
+    var todayClose = all.find(function(r){ return r.date === today && r.type === 'close'; });
+
+    var preEl  = document.getElementById('rpt-premarket-body');
+    var closeEl = document.getElementById('rpt-close-body');
+    var preTime  = document.getElementById('rpt-premarket-time');
+    var closeTime = document.getElementById('rpt-close-time');
+
+    if (todayPre) {
+      preEl.innerHTML = formatReportBody(todayPre.content);
+      if (preTime) preTime.textContent = todayPre.generatedAt || today;
+    } else {
+      preEl.innerHTML = '<span style="color:var(--muted);font-size:11px">Not yet generated today — runs at 9:00 AM ET or click ▶ Pre-Market Now</span>';
+    }
+    if (todayClose) {
+      closeEl.innerHTML = formatReportBody(todayClose.content);
+      if (closeTime) closeTime.textContent = todayClose.generatedAt || today;
+    } else {
+      closeEl.innerHTML = '<span style="color:var(--muted);font-size:11px">Not yet generated today — runs at 4:00 PM ET or click ▶ Close Report Now</span>';
+    }
+
+    renderRptHistory(all);
+  } catch(e) {
+    console.error('[REPORTS]', e);
+  }
+}
+
+function renderRptHistory(allReports) {
+  var el = document.getElementById('rpt-history');
+  if (!el) return;
+  if (!allReports) {
+    // Re-fetch
+    if (!firebaseDB) { el.innerHTML = '<span style="color:var(--muted)">No Firebase connection</span>'; return; }
+    firebaseDB.collection('vestiq').doc('reports').get().then(function(doc) {
+      var all = doc.exists ? JSON.parse(doc.data().reports || '[]') : [];
+      renderRptHistory(all);
+    });
+    return;
+  }
+  var filtered = rptFilter === 'all' ? allReports : allReports.filter(function(r){ return r.type === rptFilter; });
+  filtered = filtered.slice().reverse(); // newest first
+  if (!filtered.length) {
+    el.innerHTML = '<span style="color:var(--muted);font-size:12px">No reports yet</span>'; return;
+  }
+  el.innerHTML = filtered.map(function(r) {
+    var icon = r.type === 'premarket' ? '🌅' : '🔔';
+    var label = r.type === 'premarket' ? 'Pre-Market' : 'Market Close';
+    var id = 'rhbody-' + r.date + '-' + r.type;
+    return '<div class="card" style="padding:12px 16px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleRptItem(\"' + id + '\")">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+          '<span style="font-size:16px">' + icon + '</span>' +
+          '<div>' +
+            '<div style="font-size:12px;font-weight:600;color:var(--text)">' + label + ' — ' + r.date + '</div>' +
+            '<div style="font-size:10px;color:var(--muted);font-family:var(--fm)">' + (r.generatedAt||'') + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<span style="color:var(--muted);font-size:12px" id="' + id + '-chevron'  +'">▼</span>' +
+      '</div>' +
+      '<div id="' + id + '" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);font-size:12px;line-height:1.8">' +
+        formatReportBody(r.content) +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleRptItem(id) {
+  var el = document.getElementById(id);
+  var ch = document.getElementById(id + '-chevron');
+  if (!el) return;
+  var open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if (ch) ch.textContent = open ? '▼' : '▲';
+}
+
+function updateNextRunDisplay() {
+  var el = document.getElementById('rpt-next-run');
+  if (!el) return;
+  var now = new Date();
+  // Convert to ET
+  var etOffset = -5; // EST; DST would be -4 but keep simple
+  var et = new Date(now.getTime() + (now.getTimezoneOffset() + etOffset * -60) * 60000);
+  var h = et.getHours(), m = et.getMinutes();
+  var isWeekday = et.getDay() >= 1 && et.getDay() <= 5;
+  if (!isWeekday) { el.textContent = 'Next run: Monday 9:00 AM ET'; return; }
+  if (h < 9 || (h === 9 && m === 0)) {
+    el.textContent = 'Next run: Today 9:00 AM ET (pre-market)';
+  } else if (h < 16) {
+    el.textContent = 'Next run: Today 4:00 PM ET (close)';
+  } else {
+    el.textContent = 'Next run: Tomorrow 9:00 AM ET';
+  }
+}
+
+async function checkAutoReport() {
+  if (!firebaseDB || !anthropicKey) return;
+  var now = new Date();
+  var etOffset = now.getTimezoneOffset() + 300; // to EST
+  var et = new Date(now.getTime() - etOffset * 60000);
+  var h = et.getHours();
+  var isWeekday = et.getDay() >= 1 && et.getDay() <= 5;
+  if (!isWeekday) return;
+  var today = et.toISOString().substr(0, 10);
+
+  try {
+    var doc = await firebaseDB.collection('vestiq').doc('reports').get();
+    var all = doc.exists ? JSON.parse(doc.data().reports || '[]') : [];
+    var hasPre   = all.some(function(r){ return r.date === today && r.type === 'premarket'; });
+    var hasClose = all.some(function(r){ return r.date === today && r.type === 'close'; });
+    // Auto-generate if missed and within catchup window
+    if (!hasPre && h >= 9 && h < 12) {
+      console.log('[REPORTS] Auto-generating missed pre-market report');
+      await generateReport('premarket', true);
+    } else if (!hasClose && h >= 16 && h < 20) {
+      console.log('[REPORTS] Auto-generating missed close report');
+      await generateReport('close', true);
+    }
+  } catch(e) { console.log('[REPORTS] Auto-check failed', e); }
+}
+
+async function generateReport(type, silent) {
+  if (!anthropicKey) {
+    showToast('⚠️ Add your Anthropic API key in ⚙️ Settings first', true);
+    return;
+  }
+  if (!firebaseDB) {
+    showToast('⚠️ Connect Firebase first to save reports', true);
+    return;
+  }
+
+  var bodyEl = document.getElementById('rpt-' + type + '-body');
+  var timeEl = document.getElementById('rpt-' + type + '-time');
+  if (bodyEl) bodyEl.innerHTML = '<span style="color:var(--muted)">⏳ Generating report…</span>';
+  if (!silent) showToast('⏳ Generating ' + (type === 'premarket' ? 'pre-market' : 'close') + ' report…');
+
+  // Build portfolio snapshot for context
+  var data = enrich();
+  var totalValue = data.reduce(function(s,h){ return s+h.mktValue; }, 0);
+  var totalContrib = contributions.reduce(function(s,c){ return s+c.amount; }, 0);
+  var topHoldings = data.slice().sort(function(a,b){ return b.mktValue-a.mktValue; }).slice(0,8)
+    .map(function(h){ return h.ticker + ' ($' + h.mktValue.toFixed(0) + ', ' + (h.mktValue/totalValue*100).toFixed(1) + '%, day: ' + (h.changePct||0).toFixed(2) + '%)'; }).join(', ');
+  var tickers = data.map(function(h){ return h.ticker; }).join(', ');
+  var today = new Date().toISOString().substr(0,10);
+
+  var systemPrompt = type === 'premarket'
+    ? 'You are a personal portfolio analyst. Generate a concise, actionable pre-market briefing for a Canadian retail investor. Use ▲ for positive and ▼ for negative movements. Use ** for bold. Format with ## section headers. Be direct and specific — no fluff.'
+    : 'You are a personal portfolio analyst. Generate a concise end-of-day portfolio summary for a Canadian retail investor. Use ▲ for positive and ▼ for negative movements. Use ** for bold. Format with ## section headers. Highlight notable moves and what to watch tomorrow. Be direct and specific.';
+
+  var prePrompt =
+    'Generate a pre-market briefing for ' + today + '.\n\n' +
+    'My portfolio: ' + tickers + '\n' +
+    'Top holdings: ' + topHoldings + '\n' +
+    'Total value: $' + totalValue.toFixed(0) + ' CAD\n\n' +
+    'Include:\n## Overnight & Pre-Market\nKey overnight moves affecting my holdings or sectors\n\n' +
+    '## Macro Watch\nKey economic events, earnings, or Fed/BOC news today\n\n' +
+    '## My Portfolio Today\nWhat to watch for each major holding today\n\n' +
+    '## Key Levels\nAny important technical or news levels to watch\n\n' +
+    'Keep each section to 3-5 bullet points. Be specific with numbers where possible.';
+
+  var closePrompt =
+    'Generate a market close report for ' + today + '.\n\n' +
+    'My portfolio: ' + tickers + '\n' +
+    'Top holdings by value: ' + topHoldings + '\n' +
+    'Total portfolio value: $' + totalValue.toFixed(0) + ' CAD\n' +
+    'Total contributions: $' + totalContrib.toFixed(0) + ' CAD\n\n' +
+    'Include:\n## Portfolio Performance Today\nHow my specific holdings did today\n\n' +
+    '## Market Summary\nHow the TSX, S&P 500, and key sectors closed\n\n' +
+    '## Notable Moves\nAnything notable that moved my holdings today\n\n' +
+    "## Tomorrow's Watch List\nKey events, earnings, or levels to watch tomorrow\n\n" +
+    'Keep each section to 3-5 bullet points. Be specific with numbers where possible.';
+
+  var userPrompt = type === 'premarket' ? prePrompt : closePrompt;
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }]
+      })
+    });
+
+    var result = await response.json();
+    var content = result.content
+      .filter(function(b){ return b.type === 'text'; })
+      .map(function(b){ return b.text; })
+      .join('\n');
+
+    if (!content) throw new Error('Empty response');
+
+    var now = new Date();
+    var generatedAt = now.toLocaleString('en-CA', { timeZone:'America/Toronto', hour:'2-digit', minute:'2-digit', month:'short', day:'numeric' });
+
+    var report = { date: today, type: type, content: content, generatedAt: generatedAt };
+
+    // Save to Firebase
+    var doc = await firebaseDB.collection('vestiq').doc('reports').get();
+    var all = doc.exists ? JSON.parse(doc.data().reports || '[]') : [];
+    // Remove old report of same type+date if exists
+    all = all.filter(function(r){ return !(r.date === today && r.type === type); });
+    all.push(report);
+    // Keep last 60 reports
+    if (all.length > 60) all = all.slice(all.length - 60);
+    await firebaseDB.collection('vestiq').doc('reports').set({ reports: JSON.stringify(all) });
+
+    if (bodyEl) bodyEl.innerHTML = formatReportBody(content);
+    if (timeEl) timeEl.textContent = generatedAt;
+    if (!silent) showToast('✅ Report generated');
+    renderRptHistory(all);
+
+  } catch(e) {
+    if (bodyEl) bodyEl.innerHTML = '<span style="color:var(--red)">⚠️ Failed: ' + e.message + '</span>';
+    if (!silent) showToast('⚠️ Report failed: ' + e.message, true);
+    console.error('[REPORTS]', e);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// DAILY REPORTS
+// ══════════════════════════════════════════════════════════════
+var reportCache = {};
+
+// ── Report settings ───────────────────────────────────────────
+var rptSettings = {
+  focusAnalysis:    true,
+  focusSuggestions: true,
+  focusMacro:       true,
+  focusDividends:   true,
+  focusTechnical:   false,
+  focusSentiment:   false,
+  style:            'analytical',
+  tone:             'professional',
+  customInstructions: ''
+};
+
+function loadRptSettings() {
+  try {
+    var saved = JSON.parse(localStorage.getItem('vq_rpt_settings') || '{}');
+    Object.assign(rptSettings, saved);
+  } catch(e) {}
+}
+
+function saveRptSettings() {
+  rptSettings.focusAnalysis    = document.getElementById('rpt-focus-analysis').checked;
+  rptSettings.focusSuggestions = document.getElementById('rpt-focus-suggestions').checked;
+  rptSettings.focusMacro       = document.getElementById('rpt-focus-macro').checked;
+  rptSettings.focusDividends   = document.getElementById('rpt-focus-dividends').checked;
+  rptSettings.focusTechnical   = document.getElementById('rpt-focus-technical').checked;
+  rptSettings.focusSentiment   = document.getElementById('rpt-focus-sentiment').checked;
+  rptSettings.style            = document.getElementById('rpt-style').value;
+  rptSettings.tone             = document.getElementById('rpt-tone').value;
+  rptSettings.customInstructions = document.getElementById('rpt-custom-instructions').value.trim();
+  localStorage.setItem('vq_rpt_settings', JSON.stringify(rptSettings));
+  var saved = document.getElementById('rpt-settings-saved');
+  if (saved) { saved.textContent = '✓ Saved'; setTimeout(function(){ saved.textContent=''; }, 1500); }
+}
+
+function resetRptSettings() {
+  rptSettings = { focusAnalysis:true, focusSuggestions:true, focusMacro:true,
+    focusDividends:true, focusTechnical:false, focusSentiment:false,
+    style:'analytical', tone:'professional', customInstructions:'' };
+  localStorage.removeItem('vq_rpt_settings');
+  applyRptSettingsToUI();
+}
+
+function applyRptSettingsToUI() {
+  var s = rptSettings;
+  var set = function(id, val) { var el=document.getElementById(id); if(el) el.checked=val; };
+  var setv = function(id, val){ var el=document.getElementById(id); if(el) el.value=val; };
+  set('rpt-focus-analysis',    s.focusAnalysis);
+  set('rpt-focus-suggestions', s.focusSuggestions);
+  set('rpt-focus-macro',       s.focusMacro);
+  set('rpt-focus-dividends',   s.focusDividends);
+  set('rpt-focus-technical',   s.focusTechnical);
+  set('rpt-focus-sentiment',   s.focusSentiment);
+  setv('rpt-style', s.style);
+  setv('rpt-tone',  s.tone);
+  var ci = document.getElementById('rpt-custom-instructions');
+  if (ci) ci.value = s.customInstructions;
+}
+
+function toggleRptSettings() {
+  var body  = document.getElementById('rpt-settings-body');
+  var arrow = document.getElementById('rpt-settings-arrow');
+  var open  = body.style.display === 'none';
+  body.style.display  = open ? '' : 'none';
+  arrow.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function buildReportPrompt(type, enriched) {
+  var s = rptSettings;
+  var totalVal     = enriched.reduce(function(a,h){ return a+h.mktValue; }, 0);
+  var dayPL        = enriched.reduce(function(a,h){ return a+h.dayChange; }, 0);
+  var totalContrib = contributions.reduce(function(a,c){ return a+c.amount; }, 0);
+  var totalDivs    = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; })
+                       .reduce(function(a,t){ return a+t.amount; }, 0);
+  var totalReturn  = totalContrib > 0 ? ((totalVal - totalContrib + totalDivs) / totalContrib * 100) : 0;
+
+  var holdingLines = enriched.map(function(h) {
+    return '  - ' + h.ticker + ': ' + h.shares.toFixed(2) + ' shares @ $' + h.price.toFixed(2)
+      + ', value $' + h.mktValue.toFixed(2)
+      + ', gain ' + (h.gain>=0?'+':'-') + '$' + Math.abs(h.gain).toFixed(2) + ' (' + h.gainPct.toFixed(2) + '%)'
+      + ', today ' + (h.dayChange>=0?'+':'-') + '$' + Math.abs(h.dayChange).toFixed(2) + ' (' + (h.changePct||0).toFixed(2) + '%)';
+  });
+
+  var reportDate = new Date().toLocaleDateString('en-CA', {
+    weekday:'long', year:'numeric', month:'long', day:'numeric', timeZone:'America/New_York'
+  });
+
+  var focusList = [];
+  if (s.focusAnalysis)    focusList.push("Explain the WHY behind every significant price movement — causes, catalysts, chain reactions");
+  if (s.focusSuggestions) focusList.push("Give specific, actionable suggestions for each holding — hold, add, reduce, or watch for a trigger?");
+  if (s.focusMacro)       focusList.push("Connect macro events (rates, inflation, BoC/Fed) to how they specifically affect my holdings");
+  if (s.focusDividends)   focusList.push("Flag dividend news, upcoming ex-dates, payout sustainability signals for my holdings");
+  if (s.focusTechnical)   focusList.push("Note key technical levels — support, resistance, 50/200-day MAs — for holdings and major indices");
+  if (s.focusSentiment)   focusList.push("Assess market sentiment, fear/greed, and investor psychology near-term impact on my holdings");
+
+  var STYLES = {
+    analytical: 'Write in an analytical style with clear cause-and-effect reasoning. Go deep on the why.',
+    concise:    'Write in concise bullet points. Lead with the most important item in each section.',
+    narrative:  'Write as a flowing narrative — tell the story of what happened and why, like a financial journalist.',
+    advisor:    'Write as my personal financial advisor. Use "your portfolio", "I suggest". Be direct and personal.'
+  };
+  var TONES = {
+    professional:   'Use a professional, objective tone.',
+    conversational: 'Use a friendly, conversational tone — like explaining to a smart friend.',
+    cautious:       'Emphasize risks, downside scenarios, and what could go wrong. Be conservative.',
+    optimistic:     'Highlight opportunities, potential upside, and positive catalysts while staying factual.'
+  };
+
+  var baseSystem = type === 'premarket'
+    ? 'You are a professional portfolio analyst generating a pre-market briefing for a Canadian retail investor.'
+    : 'You are a professional portfolio analyst generating an end-of-day portfolio review for a Canadian retail investor.';
+  var systemPrompt = [baseSystem, STYLES[s.style]||'', TONES[s.tone]||'',
+    'Use markdown formatting with clear section headers.',
+    'Always search the web for current real market data before writing.'].join(' ');
+
+  var lines = [];
+  lines.push('## ' + (type==='premarket'?'Pre-Market Briefing':'End-of-Day Report') + ' — ' + reportDate);
+  lines.push('');
+  lines.push('**My Portfolio:**');
+  lines.push('- Total Value: $' + totalVal.toFixed(2) + ' CAD');
+  lines.push('- Today P&L: ' + (dayPL>=0?'+':'-') + '$' + Math.abs(dayPL).toFixed(2));
+  lines.push('- Total Return: ' + (totalReturn>=0?'+':'') + totalReturn.toFixed(2) + '%');
+  lines.push('- Total Invested: $' + totalContrib.toFixed(2) + ' CAD');
+  lines.push('- Dividends Earned: $' + totalDivs.toFixed(2) + ' CAD');
+  lines.push('');
+  lines.push('Holdings:');
+  holdingLines.forEach(function(l){ lines.push(l); });
+
+  if (focusList.length) {
+    lines.push('');
+    lines.push('**Analyst Priorities:**');
+    focusList.forEach(function(f){ lines.push('- ' + f); });
+  }
+  if (s.customInstructions) {
+    lines.push('');
+    lines.push('**My personal instructions:**');
+    lines.push(s.customInstructions);
+  }
+
+  lines.push('');
+  if (type === 'premarket') {
+    lines.push('Generate a pre-market briefing with these sections:');
+    lines.push('1. **Market Overnight** — US futures, Asian/European closes, commodities, CAD/USD — explain what drove overnight moves');
+    lines.push('2. **Today\'s Key Events** — economic releases, earnings, BoC/Fed — explain what each means for my specific holdings');
+    lines.push('3. **Holdings Outlook** — for each of my holdings, what should I watch for today and why?');
+    lines.push('4. **Sector Themes** — macro/sector forces in financials, energy, utilities, gold today');
+    lines.push('5. **Risk Factors** — what could go wrong today and how would it affect my portfolio?');
+    if (s.focusTechnical) lines.push('6. **Key Levels** — technical levels to watch on TSX and S&P 500');
+    lines.push('7. **Action Items** — specific things to do or watch during the session');
+  } else {
+    lines.push('Generate an end-of-day report with these sections:');
+    lines.push('1. **Market Summary** — TSX, S&P 500, Nasdaq closes — explain the main narrative driving today\'s moves');
+    lines.push('2. **Portfolio Analysis** — analyse today\'s moves in my specific holdings: what caused each move, does it change anything?');
+    lines.push('3. **Winners & Laggards** — deep dive on my best and worst performers — explain the specific reasons');
+    lines.push('4. **Macro & Sector Context** — how did rates, CAD, oil, gold affect my holdings today specifically?');
+    lines.push('5. **News & Catalysts** — news relevant to my holdings and what it means going forward');
+    if (s.focusDividends) lines.push('6. **Dividend Watch** — dividend announcements, ex-dates, payout sustainability');
+    lines.push('7. **Tomorrow\'s Setup** — what to watch tomorrow and what could move my holdings');
+    lines.push('8. **Overall Assessment** — is my portfolio thesis intact? What\'s the one most important thing I should know?');
+  }
+
+  return { system: systemPrompt, user: lines.join('\n'), totalVal: totalVal, dayPL: dayPL, totalReturn: totalReturn };
+}
+
+// Market schedule (Eastern Time)
+var MARKET_OPEN_ET  = { h: 9,  m: 30 }; // 9:30 AM ET
+var PREMARKET_ET    = { h: 9,  m: 0  }; // 9:00 AM ET (30 min before open)
+var MARKET_CLOSE_ET = { h: 16, m: 0  }; // 4:00 PM ET
+
+function getETNow() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+}
+
+function todayET() {
+  var d = getETNow();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function isWeekday(d) { var day = d.getDay(); return day >= 1 && day <= 5; }
+
+function formatReportKey(date, type) { return date + '-' + type; }
+
+async function loadReportCache() {
+  // Load from localStorage first
+  try { reportCache = JSON.parse(localStorage.getItem('vq_reports') || '{}'); } catch(e) { reportCache = {}; }
+  // Merge from Firebase
+  if (!firebaseDB) return;
+  try {
+    var doc = await firebaseDB.collection('vestiq').doc('reports').get();
+    if (doc.exists) {
+      var remote = JSON.parse(doc.data().cache || '{}');
+      // Merge — keep newer
+      Object.keys(remote).forEach(function(k) {
+        if (!reportCache[k] || remote[k].generatedAt > reportCache[k].generatedAt) {
+          reportCache[k] = remote[k];
+        }
+      });
+      localStorage.setItem('vq_reports', JSON.stringify(reportCache));
+    }
+  } catch(e) { console.log('[REPORTS] Firebase load failed:', e); }
+}
+
+async function saveReportCache() {
+  localStorage.setItem('vq_reports', JSON.stringify(reportCache));
+  if (!firebaseDB) return;
+  try {
+    // Keep only last 30 reports to avoid bloat
+    var keys = Object.keys(reportCache).sort().reverse().slice(0, 30);
+    var trimmed = {};
+    keys.forEach(function(k){ trimmed[k] = reportCache[k]; });
+    reportCache = trimmed;
+    await firebaseDB.collection('vestiq').doc('reports').set({ cache: JSON.stringify(reportCache) });
+  } catch(e) { console.log('[REPORTS] Firebase save failed:', e); }
+}
+
+async function initReports() {
+  loadRptSettings();
+  applyRptSettingsToUI();
+  await loadReportCache();
+  renderReportList();
+  updateNextReportInfo();
+  autoGenerateIfDue();
+}
+
+function updateNextReportInfo() {
+  var el = document.getElementById('rpt-next-info');
+  if (!el) return;
+  var now = getETNow();
+  if (!isWeekday(now)) { el.textContent = 'Next report: Monday pre-market (9:00 AM ET)'; return; }
+  var h = now.getHours(), m = now.getMinutes();
+  var totalMins = h * 60 + m;
+  var preMins   = PREMARKET_ET.h * 60 + PREMARKET_ET.m;
+  var closeMins = MARKET_CLOSE_ET.h * 60 + MARKET_CLOSE_ET.m;
+  if (totalMins < preMins) {
+    var diff = preMins - totalMins;
+    el.textContent = 'Pre-market report due in ' + diff + ' min (9:00 AM ET)';
+  } else if (totalMins < closeMins) {
+    var diff2 = closeMins - totalMins;
+    el.textContent = 'Close report due in ' + Math.floor(diff2/60) + 'h ' + (diff2%60) + 'm (4:00 PM ET)';
+  } else {
+    el.textContent = 'Both reports done for today. Next: tomorrow pre-market.';
+  }
+}
+
+function autoGenerateIfDue() {
+  if (!anthropicKey) return;
+  var now   = getETNow();
+  var today = todayET();
+  if (!isWeekday(now)) return;
+  var h = now.getHours(), m = now.getMinutes();
+  var totalMins = h * 60 + m;
+  var preMins   = PREMARKET_ET.h    * 60 + PREMARKET_ET.m;
+  var closeMins = MARKET_CLOSE_ET.h * 60 + MARKET_CLOSE_ET.m;
+  var preKey    = formatReportKey(today, 'premarket');
+  var closeKey  = formatReportKey(today, 'close');
+  // Generate pre-market if it\'s past 9:00 AM and not done
+  if (totalMins >= preMins && !reportCache[preKey]) {
+    setTimeout(function(){ generateReport('premarket', true); }, 1500);
+    return;
+  }
+  // Generate close if it\'s past 4:00 PM and not done
+  if (totalMins >= closeMins && !reportCache[closeKey]) {
+    setTimeout(function(){ generateReport('close', true); }, 1500);
+  }
+}
+
+async function generateReport(type, auto) {
+  if (!anthropicKey) {
+    showToast('⚠️ Add your Anthropic API key in ⚙️ Settings first', true);
+    showKeyModal();
+    return;
+  }
+  var today  = todayET();
+  var key    = formatReportKey(today, type);
+  var btnId  = type === 'premarket' ? 'rpt-premarket-btn' : 'rpt-close-btn';
+  var btn    = document.getElementById(btnId);
+  if (btn) { btn.textContent = '⏳ Generating…'; btn.disabled = true; }
+  showToast(auto ? '⏰ Auto-generating ' + type + ' report…' : '⏳ Generating report…');
+
+  try {
+    var enriched = enrich();
+    var prompt   = buildReportPrompt(type, enriched);
+    var isPremarket = type === 'premarket';
+
+    var resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        system: prompt.system,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt.user }]
+      })
+    });
+
+    if (!resp.ok) throw new Error('API error ' + resp.status);
+    var data = await resp.json();
+
+    // Extract text from content blocks (may include tool_use/tool_result blocks)
+    var reportText = data.content
+      .filter(function(b){ return b.type === 'text'; })
+      .map(function(b){ return b.text; })
+      .join('\n');
+
+    if (!reportText) throw new Error('Empty response');
+
+    var report = {
+      type: type,
+      date: today,
+      generatedAt: new Date().toISOString(),
+      text: reportText,
+      portfolioValue: prompt.totalVal,
+      dayPL: prompt.dayPL,
+      totalReturn: prompt.totalReturn,
+      auto: !!auto,
+      settings: JSON.parse(JSON.stringify(rptSettings))
+    };
+
+    reportCache[key] = report;
+    await saveReportCache();
+    renderReportList();
+    showReport(key);
+    showToast('✅ ' + (isPremarket ? 'Pre-market' : 'Close') + ' report generated');
+
+  } catch(e) {
+    showToast('⚠️ Report failed: ' + e.message, true);
+    console.error('[REPORTS]', e);
+  } finally {
+    if (btn) { btn.textContent = isPremarket ? '⚡ Pre-Market Now' : '⚡ Close Report Now'; btn.disabled = false; }
+  }
+}
+
+function renderReportList() {
+  var sel = document.getElementById('rpt-selector');
+  if (!sel) return;
+  var keys = Object.keys(reportCache).sort().reverse();
+  if (!keys.length) { sel.innerHTML = ''; return; }
+  sel.innerHTML = keys.map(function(k) {
+    var r = reportCache[k];
+    var label = r.date + ' ' + (r.type === 'premarket' ? '🌅 Pre' : '🔔 Close');
+    return '<button class="sort-btn" onclick="showReport(\"' + k + '\")" id="rptbtn-' + k.replace(/[^a-zA-Z0-9-]/g,'_') + '">' + label + '</button>';
+  }).join('');
+  // Show most recent by default
+  showReport(keys[0]);
+}
+
+function showReport(key) {
+  // Highlight selected button
+  Object.keys(reportCache).forEach(function(k) {
+    var b = document.getElementById('rptbtn-' + k.replace(/[^a-zA-Z0-9-]/g,'_'));
+    if (b) b.classList.toggle('on', k === key);
+  });
+
+  var report = reportCache[key];
+  var el = document.getElementById('rpt-display');
+  if (!el || !report) return;
+
+  var typeLabel  = report.type === 'premarket' ? '🌅 Pre-Market Briefing' : '🔔 End-of-Day Report';
+  var genTime    = new Date(report.generatedAt).toLocaleString('en-CA', { timeZone: 'America/New_York', hour:'2-digit', minute:'2-digit', hour12:true });
+  var autoLabel  = report.auto ? ' · auto-generated' : ' · manual';
+
+  el.innerHTML =
+    '<div class="card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">' +
+        '<div>' +
+          '<div style="font-size:18px;font-weight:700;font-family:var(--fh)">' + typeLabel + '</div>' +
+          '<div style="font-size:11px;color:var(--muted);font-family:var(--fm);margin-top:3px">' + report.date + ' · generated ' + genTime + ' ET' + autoLabel + '</div>' +
+        '</div>' +
+        '<div style="text-align:right;font-family:var(--fm)">' +
+          '<div style="font-size:14px;font-weight:600">$' + report.portfolioValue.toFixed(2) + '</div>' +
+          '<div style="font-size:12px" class="' + (report.dayPL>=0?'up':'dn') + '">' + (report.dayPL>=0?'+':'-') + '$' + Math.abs(report.dayPL).toFixed(2) + ' today</div>' +
+          '<div style="font-size:11px;color:var(--muted)">' + (report.totalReturn>=0?'+':'') + report.totalReturn.toFixed(2) + '% total return</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="rpt-md-' + key + '" style="font-size:13px;line-height:1.8;color:var(--text)"></div>' +
+    '</div>';
+
+  // Render markdown
+  renderMarkdown(report.text, 'rpt-md-' + key);
+}
+
+function renderMarkdown(md, targetId) {
+  var el = document.getElementById(targetId);
+  if (!el) return;
+  var html = md
+    .replace(/^# (.+)$/gm,    '<h2 style="font-size:18px;font-weight:800;color:var(--accent);margin:20px 0 8px;font-family:var(--fh)">$1</h2>')
+    .replace(/^## (.+)$/gm,   '<h3 style="font-size:15px;font-weight:700;color:var(--accent2);margin:16px 0 6px;font-family:var(--fh)">$1</h3>')
+    .replace(/^### (.+)$/gm,  '<h4 style="font-size:13px;font-weight:700;color:var(--text);margin:12px 0 4px">$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--text)">$1</strong>')
+    .replace(/\*(.+?)\*/g,    '<em>$1</em>')
+    .replace(/`(.+?)`/g,      '<code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px;font-family:var(--fm);font-size:12px">$1</code>')
+    .replace(/^[-*] (.+)$/gm, '<div style="padding:3px 0 3px 16px;border-left:2px solid var(--border);margin:3px 0">· $1</div>')
+    .replace(/^\d+\. (.+)$/gm,'<div style="padding:3px 0 3px 16px">$1</div>')
+    .replace(/^---$/gm,       '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0"/>')
+    .replace(/\n\n/g, '<br/><br/>')
+    .replace(/\n/g,   '<br/>');
+  el.innerHTML = html;
+}
+
+// Check auto-generate every minute while app is open
+setInterval(function() {
+  if (document.getElementById('pane-reports') &&
+      document.getElementById('pane-reports').classList.contains('active')) {
+    updateNextReportInfo();
+    autoGenerateIfDue();
+  } else {
+    // Still check even if tab not open
+    autoGenerateIfDue();
+  }
+}, 60000);
 
 // ══════════════════════════════════════════════════════════════
 // STOCK SCREENER
