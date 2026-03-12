@@ -372,6 +372,7 @@ canvas + *{color:#e8eaf0 !important}
   <button class="stab" id="stab-watchlist" onclick="showTab('watchlist')"><span class="stab-icon">👁</span>Watchlist</button>
   <button class="stab" id="stab-ai" onclick="showTab('ai')"><span class="stab-icon">🤖</span>AI</button>
   <div class="stab-group-label">MANAGE</div>
+  <button class="stab" id="stab-debug" onclick="showTab('debug')"><span class="stab-icon">🔧</span>Debug</button>
   <button class="stab" id="stab-txn" onclick="showTab('txn')"><span class="stab-icon">📋</span>Transactions</button>
   <button class="stab" id="stab-div" onclick="showTab('div')"><span class="stab-icon">💵</span>Dividends</button>
   <button class="stab" id="stab-contrib" onclick="showTab('contrib')"><span class="stab-icon">💰</span>Contributions</button>
@@ -1218,6 +1219,18 @@ canvas + *{color:#e8eaf0 !important}
   </div>
 </div>
 
+
+<!-- ══════════════ DEBUG PANEL ══════════════ -->
+<div id="pane-debug" class="pane" style="padding:16px">
+  <div class="card">
+    <div class="ctitle">🔧 Price Fetch Debug</div>
+    <div style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:12px">
+      Tests each price source live and shows exactly what's working or broken.
+    </div>
+    <button onclick="runDebug()" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 20px;font-weight:700;font-family:var(--fm);cursor:pointer;margin-bottom:16px">▶ Run Diagnosis</button>
+    <div id="debugOut" style="font-family:monospace;font-size:12px;line-height:1.8;white-space:pre-wrap;color:var(--fg)"></div>
+  </div>
+</div>
 </main>
 
 <!-- Firebase Modal -->
@@ -5727,6 +5740,111 @@ function manualRefresh() {
   }).catch(function(){
     reset(btn); reset(btn2);
   });
+}
+
+
+async function runDebug() {
+  var out = document.getElementById('debugOut');
+  out.textContent = 'Starting diagnosis...\n\n';
+  var log = function(msg) { out.textContent += msg + '\n'; };
+
+  // 1. Check FMP key
+  var fmp = localStorage.getItem('vq_fmpkey') || '';
+  var worker = localStorage.getItem('vq_worker_url') || '';
+  log('=== SETTINGS ===');
+  log('FMP key:    ' + (fmp ? '✅ set (' + fmp.substring(0,6) + '...)' : '❌ NOT SET'));
+  log('Worker URL: ' + (worker ? '✅ ' + worker : '⚠️ not set'));
+  log('');
+
+  // 2. Test FMP directly
+  log('=== FMP DIRECT TEST ===');
+  if (!fmp) {
+    log('⏭ Skipped — no FMP key');
+  } else {
+    try {
+      var r = await fetch('https://financialmodelingprep.com/api/v3/quote/AAPL?apikey=' + fmp, { signal: AbortSignal.timeout(8000) });
+      log('Status: ' + r.status);
+      var d = await r.json();
+      if (d && d[0] && d[0].price) {
+        log('✅ FMP works! AAPL = $' + d[0].price);
+      } else if (d && d['Error Message']) {
+        log('❌ FMP error: ' + d['Error Message']);
+      } else {
+        log('⚠️ FMP returned: ' + JSON.stringify(d).substring(0,100));
+      }
+    } catch(e) { log('❌ FMP fetch threw: ' + e.message); }
+  }
+  log('');
+
+  // 3. Test FMP for a TSX ticker
+  log('=== FMP TSX TEST (ENB) ===');
+  if (!fmp) {
+    log('⏭ Skipped — no FMP key');
+  } else {
+    try {
+      var r2 = await fetch('https://financialmodelingprep.com/api/v3/quote/ENB.TSX?apikey=' + fmp, { signal: AbortSignal.timeout(8000) });
+      log('Status: ' + r2.status);
+      var d2 = await r2.json();
+      if (d2 && d2[0] && d2[0].price) {
+        log('✅ FMP TSX works! ENB.TSX = $' + d2[0].price);
+      } else {
+        log('⚠️ ENB.TSX returned: ' + JSON.stringify(d2).substring(0,150));
+        // try without exchange
+        var r2b = await fetch('https://financialmodelingprep.com/api/v3/quote/ENB?apikey=' + fmp, { signal: AbortSignal.timeout(8000) });
+        var d2b = await r2b.json();
+        log('ENB (no suffix): ' + JSON.stringify(d2b).substring(0,150));
+      }
+    } catch(e) { log('❌ FMP TSX threw: ' + e.message); }
+  }
+  log('');
+
+  // 4. Test Worker
+  log('=== WORKER TEST ===');
+  if (!worker) {
+    log('⏭ Skipped — no worker URL set');
+  } else {
+    try {
+      var testUrl = worker + '?url=' + encodeURIComponent('https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1d');
+      var r3 = await fetch(testUrl, { signal: AbortSignal.timeout(8000) });
+      log('Status: ' + r3.status);
+      var t3 = await r3.text();
+      if (t3 && t3.includes('regularMarketPrice')) {
+        log('✅ Worker works!');
+      } else {
+        log('⚠️ Worker response: ' + t3.substring(0,150));
+      }
+    } catch(e) { log('❌ Worker threw: ' + e.message); }
+  }
+  log('');
+
+  // 5. Test public proxies
+  log('=== PUBLIC PROXY TEST ===');
+  var proxies = [
+    'https://corsproxy.io/?',
+    'https://api.allorigins.win/get?url=',
+    'https://api.codetabs.com/v1/proxy?quest=',
+  ];
+  var yahooTest = 'https://query1.finance.yahoo.com/v8/finance/chart/AAPL?interval=1d&range=1d';
+  for (var i = 0; i < proxies.length; i++) {
+    try {
+      var pr = await fetch(proxies[i] + encodeURIComponent(yahooTest), { signal: AbortSignal.timeout(6000) });
+      var pt = await pr.text();
+      if (pt && pt.includes('regularMarketPrice')) {
+        log('✅ ' + proxies[i].split('/')[2] + ' works');
+      } else if (pt && pt.includes('"contents"')) {
+        var pw = JSON.parse(pt);
+        if (pw.contents && pw.contents.includes('regularMarketPrice')) {
+          log('✅ ' + proxies[i].split('/')[2] + ' works (wrapped)');
+        } else {
+          log('⚠️ ' + proxies[i].split('/')[2] + ': ' + pt.substring(0,80));
+        }
+      } else {
+        log('❌ ' + proxies[i].split('/')[2] + ': ' + (pt||'empty').substring(0,80));
+      }
+    } catch(e) { log('❌ ' + proxies[i].split('/')[2] + ': ' + e.message); }
+  }
+  log('\n=== DONE ===');
+  log('Share this output to diagnose the issue.');
 }
 
 </script>
