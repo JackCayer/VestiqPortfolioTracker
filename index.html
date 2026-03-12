@@ -1524,13 +1524,15 @@ async function fetchPrices() {
   // Fetch CAD/USD rate — try FMP first, Yahoo as fallback
   try {
     var fxGot = false;
-    if (fmpKey) {
+    if (fmpKey && !_fmpBroken) {
       try {
-        var fmpFxResp = await fetch('https://financialmodelingprep.com/api/v3/fx/CADUSD?apikey=' + fmpKey, { signal: AbortSignal.timeout(6000) });
-        if (fmpFxResp.ok) {
+        var fmpFxResp = await fetch('https://financialmodelingprep.com/stable/fx?symbol=CADUSD&apikey=' + fmpKey, { signal: AbortSignal.timeout(6000) });
+        if (fmpFxResp.status === 403) { _fmpBroken = true; }
+        else if (fmpFxResp.ok) {
           var fmpFxData = await fmpFxResp.json();
-          if (fmpFxData && fmpFxData[0] && fmpFxData[0].ask) {
-            cadPerUsd = Math.round((1 / fmpFxData[0].ask) * 10000) / 10000;
+          var fxQ = Array.isArray(fmpFxData) ? fmpFxData[0] : fmpFxData;
+          if (fxQ && (fxQ.ask || fxQ.price)) {
+            cadPerUsd = Math.round((1 / (fxQ.ask || fxQ.price)) * 10000) / 10000;
             fxGot = true;
             console.log('FMP FX rate: 1 USD = ' + cadPerUsd.toFixed(4) + ' CAD');
           }
@@ -1972,27 +1974,23 @@ function clearAll() {
 // ── PROXY HELPER ─────────────────────────────────────────────────────────────
 // Tries multiple CORS proxies in order until one works
 async function fetchViaProxy(targetUrl) {
-  // Try Cloudflare Worker first if configured
   var workerUrl = localStorage.getItem('vq_worker_url') || '';
 
+  // Worker is primary — if set, try it ONLY (no public proxies hammered)
+  // Public proxies only used if no worker is configured
   var proxies = [];
-
-  // Always try worker first if set
   if (workerUrl) {
     proxies.push(function(u) { return workerUrl + '?url=' + encodeURIComponent(u); });
+  } else {
+    // No worker — fall back to public proxies (rate-limited, use sparingly)
+    proxies = [
+      function(u) { return 'https://api.allorigins.win/get?url=' + encodeURIComponent(u); },
+      function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); },
+      function(u) { return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); },
+      function(u) { return 'https://corsproxy.org/?' + encodeURIComponent(u); },
+      function(u) { return 'https://thingproxy.freeboard.io/fetch/' + u; },
+    ];
   }
-
-  // Public proxies as fallback
-  proxies = proxies.concat([
-    function(u) { return 'https://corsproxy.io/?' + encodeURIComponent(u); },
-    function(u) { return 'https://api.allorigins.win/get?url=' + encodeURIComponent(u); },
-    function(u) { return 'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(u); },
-    function(u) { return 'https://thingproxy.freeboard.io/fetch/' + u; },
-    function(u) { return 'https://corsproxy.org/?' + encodeURIComponent(u); },
-    function(u) { return 'https://proxy.cors.sh/' + u; },
-    function(u) { return 'https://yacdn.org/proxy/' + u; },
-    function(u) { return 'https://cors-anywhere.herokuapp.com/' + u; },
-  ]);
 
   for (var i = 0; i < proxies.length; i++) {
     try {
@@ -2023,40 +2021,32 @@ async function fetchViaProxy(targetUrl) {
   console.warn('[Vestiq] All proxies failed — prices unavailable. Deploy a Cloudflare Worker for reliable data.');
   return null;
 }
+var _fmpBroken = false; // cached after first 403 so we stop trying
 async function fetchPriceFromFMP(ticker) {
-  if (!fmpKey) return null;
-  // FMP uses exchange suffix differently: TSX = TSX exchange, no .TO
+  if (!fmpKey || _fmpBroken) return null;
   var fmpTicker = ticker.replace('.TO','').replace('.V','');
   var exchange  = ticker.endsWith('.TO') ? 'TSX' : ticker.endsWith('.V') ? 'TSXV' : null;
-  var url = 'https://financialmodelingprep.com/api/v3/quote/' + fmpTicker + (exchange ? '.' + exchange : '') + '?apikey=' + fmpKey;
-  try {
-    var resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    if (!resp.ok) return null;
-    var data = await resp.json();
-    if (!data || !data[0]) {
-      // Try without exchange suffix as fallback
-      if (exchange) {
-        url = 'https://financialmodelingprep.com/api/v3/quote/' + fmpTicker + '?apikey=' + fmpKey;
-        resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-        if (!resp.ok) return null;
-        data = await resp.json();
-        if (!data || !data[0]) return null;
-      } else {
-        return null;
+  // Try new v4 endpoint first, then v3
+  var urls = [
+    'https://financialmodelingprep.com/stable/quote?symbol=' + fmpTicker + (exchange ? '.' + exchange : '') + '&apikey=' + fmpKey,
+    'https://financialmodelingprep.com/stable/quote?symbol=' + fmpTicker + '&apikey=' + fmpKey,
+  ];
+  for (var i = 0; i < urls.length; i++) {
+    try {
+      var resp = await fetch(urls[i], { signal: AbortSignal.timeout(8000) });
+      if (resp.status === 403) { _fmpBroken = true; return null; }
+      if (!resp.ok) continue;
+      var data = await resp.json();
+      if (data && data['Error Message'] && data['Error Message'].indexOf('Legacy') > -1) {
+        _fmpBroken = true; return null;
       }
-    }
-    var q = data[0];
-    if (!q.price) return null;
-    console.log('[Vestiq] FMP fallback succeeded for ' + ticker);
-    return {
-      price: q.price,
-      prev:  q.previousClose || q.price,
-      name:  q.name || ticker,
-    };
-  } catch(e) {
-    console.warn('[Vestiq] FMP fallback failed for ' + ticker, e.message);
-    return null;
+      var q = Array.isArray(data) ? data[0] : data;
+      if (!q || !q.price) continue;
+      console.log('[Vestiq] FMP succeeded for ' + ticker);
+      return { price: q.price, prev: q.previousClose || q.price, name: q.name || ticker };
+    } catch(e) { continue; }
   }
+  return null;
 }
 
 
