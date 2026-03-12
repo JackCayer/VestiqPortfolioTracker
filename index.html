@@ -1508,21 +1508,36 @@ async function fetchPrices() {
   holdings.forEach(function(h){ if (tickers.indexOf(h.ticker) === -1) tickers.push(h.ticker); });
   if (!tickers.length) { renderAll(); return; }
 
-  // Fetch CAD/USD rate once for converting US-listed stocks (updates global)
+  // Fetch CAD/USD rate — try FMP first, Yahoo as fallback
   try {
-    var fxRaw = await fetchViaProxy('https://query1.finance.yahoo.com/v8/finance/chart/CADUSD%3DX?interval=1d&range=1d');
-    if (fxRaw) {
-      var fxData = JSON.parse(fxRaw);
-      var fxMeta = fxData && fxData.chart && fxData.chart.result && fxData.chart.result[0] && fxData.chart.result[0].meta;
-      if (fxMeta && fxMeta.regularMarketPrice) {
-        // CADUSD=X gives how many USD per 1 CAD, so invert to get CAD per USD
-        cadPerUsd = Math.round((1 / fxMeta.regularMarketPrice) * 10000) / 10000;
-        console.log('Live CAD/USD rate: 1 USD = ' + cadPerUsd.toFixed(4) + ' CAD');
-        var fxEl = document.getElementById('fxRate');
-        if (fxEl) fxEl.textContent = '1 USD = ' + cadPerUsd.toFixed(4) + ' CAD';
+    var fxGot = false;
+    if (fmpKey) {
+      try {
+        var fmpFxResp = await fetch('https://financialmodelingprep.com/api/v3/fx/CADUSD?apikey=' + fmpKey, { signal: AbortSignal.timeout(6000) });
+        if (fmpFxResp.ok) {
+          var fmpFxData = await fmpFxResp.json();
+          if (fmpFxData && fmpFxData[0] && fmpFxData[0].ask) {
+            cadPerUsd = Math.round((1 / fmpFxData[0].ask) * 10000) / 10000;
+            fxGot = true;
+            console.log('FMP FX rate: 1 USD = ' + cadPerUsd.toFixed(4) + ' CAD');
+          }
+        }
+      } catch(e2) { console.log('FMP FX failed:', e2.message); }
+    }
+    if (!fxGot) {
+      var fxRaw = await fetchViaProxy('https://query1.finance.yahoo.com/v8/finance/chart/CADUSD%3DX?interval=1d&range=1d');
+      if (fxRaw) {
+        var fxData = JSON.parse(fxRaw);
+        var fxMeta = fxData && fxData.chart && fxData.chart.result && fxData.chart.result[0] && fxData.chart.result[0].meta;
+        if (fxMeta && fxMeta.regularMarketPrice) {
+          cadPerUsd = Math.round((1 / fxMeta.regularMarketPrice) * 10000) / 10000;
+          console.log('Yahoo FX rate: 1 USD = ' + cadPerUsd.toFixed(4) + ' CAD');
+        }
       }
     }
-  } catch(e) { console.log('FX fetch failed, using fallback rate 1.36'); }
+    var fxEl = document.getElementById('fxRate');
+    if (fxEl) fxEl.textContent = '1 USD = ' + cadPerUsd.toFixed(4) + ' CAD';
+  } catch(e) { console.log('FX fetch failed, using fallback rate', cadPerUsd); }
 
   for (var i = 0; i < tickers.length; i++) {
     var t = tickers[i];
@@ -1541,27 +1556,9 @@ async function fetchPrices() {
       isTSX = isTSXList || isTSXVList;
       yahooTicker = isTSXVList ? t + '.V' : isTSXList ? t + '.TO' : t;
     }
-    try {
-      var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + yahooTicker + '?interval=1d&range=1d';
-      var raw2  = await fetchWithRetry(yahooUrl, 2);
-      if (!raw2) throw new Error('proxy failed after retries');
-      var data  = JSON.parse(raw2);
-      var meta  = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
-      if (meta && meta.regularMarketPrice) {
-        var rawPrice  = meta.regularMarketPrice;
-        var rawPrev   = meta.previousClose || meta.chartPreviousClose || rawPrice;
-        // Convert USD -> CAD for US-listed stocks; TSX stocks are already CAD
-        var fx        = isTSX ? 1 : cadPerUsd;
-        var price     = Math.round(rawPrice * fx * 100) / 100;
-        var prev      = Math.round(rawPrev  * fx * 100) / 100;
-        var change    = Math.round((price - prev) * 10000) / 10000;
-        var changePct = prev ? Math.round((change / prev) * 100 * 100) / 100 : 0;
-        prices[t] = { price: price, change: change, changePct: changePct, name: meta.longName || meta.shortName || t, currency: isTSX ? 'CAD' : 'USD→CAD', stale: false };
-      } else {
-        throw new Error('no price in response');
-      }
-    } catch(e) {
-      // Yahoo/proxy failed — try FMP fallback
+    // ── Try FMP first (direct CORS, no proxy needed) then Yahoo as fallback ──
+    var gotPrice = false;
+    if (fmpKey) {
       var fmpResult = await fetchPriceFromFMP(t);
       if (fmpResult) {
         var fx2    = isTSX ? 1 : cadPerUsd;
@@ -1570,7 +1567,30 @@ async function fetchPrices() {
         var chg2   = Math.round((price2 - prev2) * 10000) / 10000;
         var chgP2  = prev2 ? Math.round((chg2 / prev2) * 100 * 100) / 100 : 0;
         prices[t] = { price: price2, change: chg2, changePct: chgP2, name: fmpResult.name, currency: isTSX ? 'CAD' : 'USD→CAD', stale: false, source: 'FMP' };
-      } else {
+        gotPrice = true;
+      }
+    }
+    if (!gotPrice) {
+      try {
+        var yahooUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/' + yahooTicker + '?interval=1d&range=1d';
+        var raw2  = await fetchWithRetry(yahooUrl, 2);
+        if (!raw2) throw new Error('proxy failed');
+        var data  = JSON.parse(raw2);
+        var meta  = data && data.chart && data.chart.result && data.chart.result[0] && data.chart.result[0].meta;
+        if (meta && meta.regularMarketPrice) {
+          var rawPrice  = meta.regularMarketPrice;
+          var rawPrev   = meta.previousClose || meta.chartPreviousClose || rawPrice;
+          var fx        = isTSX ? 1 : cadPerUsd;
+          var price     = Math.round(rawPrice * fx * 100) / 100;
+          var prev      = Math.round(rawPrev  * fx * 100) / 100;
+          var change    = Math.round((price - prev) * 10000) / 10000;
+          var changePct = prev ? Math.round((change / prev) * 100 * 100) / 100 : 0;
+          prices[t] = { price: price, change: change, changePct: changePct, name: meta.longName || meta.shortName || t, currency: isTSX ? 'CAD' : 'USD→CAD', stale: false, source: 'Yahoo' };
+          gotPrice = true;
+        } else {
+          throw new Error('no price in Yahoo response');
+        }
+      } catch(e) {
         // Both failed — keep last known price, never zero out
         if (!prices[t] || !prices[t].price) {
           var h = holdings.find(function(x){ return x.ticker === t; });
