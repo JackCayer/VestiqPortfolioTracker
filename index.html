@@ -1527,7 +1527,7 @@ async function fetchPrices() {
     if (fmpKey && !_fmpBroken) {
       try {
         var fmpFxResp = await fetch('https://financialmodelingprep.com/stable/fx?symbol=CADUSD&apikey=' + fmpKey, { signal: AbortSignal.timeout(6000) });
-        if (fmpFxResp.status === 403) { _fmpBroken = true; }
+        if (fmpFxResp.status === 403 || fmpFxResp.status === 429) { _fmpBroken = true; }
         else if (fmpFxResp.ok) {
           var fmpFxData = await fmpFxResp.json();
           var fxQ = Array.isArray(fmpFxData) ? fmpFxData[0] : fmpFxData;
@@ -2034,12 +2034,10 @@ async function fetchPriceFromFMP(ticker) {
   for (var i = 0; i < urls.length; i++) {
     try {
       var resp = await fetch(urls[i], { signal: AbortSignal.timeout(8000) });
-      if (resp.status === 403) { _fmpBroken = true; return null; }
+      if (resp.status === 403 || resp.status === 429) { _fmpBroken = true; return null; }
       if (!resp.ok) continue;
       var data = await resp.json();
-      if (data && data['Error Message'] && data['Error Message'].indexOf('Legacy') > -1) {
-        _fmpBroken = true; return null;
-      }
+      if (data && data['Error Message']) { _fmpBroken = true; return null; }
       var q = Array.isArray(data) ? data[0] : data;
       if (!q || !q.price) continue;
       console.log('[Vestiq] FMP succeeded for ' + ticker);
