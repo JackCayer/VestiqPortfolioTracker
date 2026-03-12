@@ -1995,10 +1995,12 @@ async function fetchViaProxy(targetUrl) {
   for (var i = 0; i < proxies.length; i++) {
     try {
       var proxyUrl = proxies[i](targetUrl);
-      var resp = await fetch(proxyUrl, {
-        signal: AbortSignal.timeout(7000),
-        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
-      });
+      var fetchOpts = { signal: AbortSignal.timeout(7000) };
+      // Don't send User-Agent to Worker (CORS preflight rejects it)
+      if (!workerUrl || proxyUrl.indexOf(workerUrl) === -1) {
+        fetchOpts.headers = { 'User-Agent': 'Mozilla/5.0' };
+      }
+      var resp = await fetch(proxyUrl, fetchOpts);
       if (!resp.ok) continue;
       var text = await resp.text();
       if (!text || text.trim() === '') continue;
