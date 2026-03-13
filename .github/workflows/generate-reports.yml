@@ -85,7 +85,7 @@ jobs:
           for ATTEMPT in 1 2 3; do
             echo "Attempt $ATTEMPT..."
             RESPONSE=$(curl -s -X POST \
-              "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
+              "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}" \
               -H "Content-Type: application/json" \
               -d "{
                 \"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": $(echo "$PROMPT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}]}],
@@ -147,7 +147,7 @@ jobs:
               \"content\": ${ESCAPED_TEXT},
               \"generatedAt\": \"${NOW}\",
               \"auto\": true,
-              \"model\": \"gemini-2.0-flash\"
+              \"model\": \"gemini-1.5-flash\"
             }")
 
           if [ "$HTTP_STATUS" = "200" ]; then
