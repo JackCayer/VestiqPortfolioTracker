@@ -326,7 +326,8 @@ canvas + *{color:#e8eaf0 !important}
   canvas{ max-height:220px !important }
 
   .tbl th,.tbl td{ padding:7px 6px !important;font-size:11px !important }
-  #dashBody tr td:nth-child(9){ display:none }
+  #dashBody tr td:nth-child(9){ } /* yield col — keep visible */
+  #dashBody tr td:nth-child(10){ display:none } /* notes hidden on mobile */
 
   /* hide gif on mobile */
   #nyan-gif{ display:none !important }
@@ -488,6 +489,7 @@ canvas + *{color:#e8eaf0 !important}
         <th onclick="setSort('mktValue')"  style="cursor:pointer" id="th-mktValue">Mkt Value ⇅</th>
         <th onclick="setSort('gain')"      style="cursor:pointer" id="th-gain">Gain ⇅</th>
         <th onclick="setSort('dayChange')" style="cursor:pointer" id="th-dayChange">Day P&amp;L ⇅</th>
+        <th>Yield</th>
         <th>Notes</th>
       </tr></thead>
       <tbody id="dashBody"></tbody>
@@ -574,12 +576,12 @@ canvas + *{color:#e8eaf0 !important}
 <!-- ══════════════ AI ADVISOR ══════════════ -->
 <div id="pane-ai" class="pane">
   <div class="card">
-    <div class="ctitle">🤖 AI Advisor — Powered by Claude</div>
+    <div class="ctitle">🤖 AI Advisor</div>
     <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:16px;line-height:1.7">
       Claude knows your full portfolio and searches real-time news before answering. Ask anything.
     </p>
     <div id="noKeyWarning" style="display:none;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;font-family:var(--fm);color:#aaa">
-      ⚙️ No API key set — <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="showKeyModal()">click here to add your Anthropic API key</span> to enable the AI Advisor.
+      ⚙️ No API key set — <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="showKeyModal()">click here to add a Gemini key (free)</span> or Anthropic key to enable the AI Advisor.
     </div>
     <div class="chips">
       <button class="chip" onclick="useChip(this)">What's my biggest risk right now?</button>
@@ -1264,12 +1266,14 @@ canvas + *{color:#e8eaf0 !important}
 <!-- API Key Modal -->
 <div id="keyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:480px;width:90%;position:relative">
-    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:8px">⚙️ Anthropic API Key</div>
-    <p style="font-size:13px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:20px">
-      Required for the AI Advisor. Get a free key at <strong style="color:var(--accent2)">console.anthropic.com</strong><br>
-      Your key is saved locally in your browser only — never sent anywhere except Anthropic.
+    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:8px">⚙️ AI API Keys</div>
+    <p style="font-size:13px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:16px">
+      Gemini is free (1500 requests/day). Get a key at <strong style="color:#4af0c8">aistudio.google.com</strong> — no credit card needed.<br>
+      Anthropic is pay-as-you-go. Gemini is used if set, otherwise falls back to Anthropic.
     </p>
-    <div class="flbl" style="margin-bottom:6px">Anthropic API Key (starts with sk-ant-...)</div>
+    <div class="flbl" style="margin-bottom:6px">Gemini API Key <span style="color:var(--green);font-size:10px">FREE TIER AVAILABLE</span></div>
+    <input id="geminiKeyInput" class="ifield" type="password" placeholder="AIza..." style="margin-bottom:16px;font-family:var(--fm)"/>
+    <div class="flbl" style="margin-bottom:6px">Anthropic API Key (fallback, starts with sk-ant-...)</div>
     <input id="keyInput" class="ifield" type="password" placeholder="sk-ant-api03-..." style="margin-bottom:20px;font-family:var(--fm)"/>
 
     <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:16px">
@@ -1305,6 +1309,7 @@ canvas + *{color:#e8eaf0 !important}
 // ── STATE ─────────────────────────────────────────────────────────────────
 var holdings   = [];
 var prices     = {};
+var divYields  = {}; // { ticker: annualYieldPct }
 // ── CHART GLOBAL DEFAULTS (Chart.js v4 correct API) ─────────────────────
 Chart.defaults.color = '#a0a8c0';
 Chart.defaults.borderColor = 'rgba(255,255,255,.07)';
@@ -1353,7 +1358,7 @@ function showTab(name) {
   if (name === 'charts') setTimeout(function(){ drawCharts(enrich()); renderAllocation(enrich()); }, 80);
   if (name === 'ai') {
     var w = document.getElementById('noKeyWarning');
-    if (w) w.style.display = anthropicKey ? 'none' : 'block';
+    if (w) w.style.display = (geminiKey || anthropicKey) ? 'none' : 'block';
   }
   if (name === 'contrib') { renderContribs(); setTimeout(function(){ if(contributions.length) drawContribChart(enrich().reduce(function(s,h){return s+h.mktValue;},0), contributions.reduce(function(s,c){return s+c.amount;},0)); }, 100); }
   if (name === 'txn') { renderTxns(); updateTxnForm(); }
@@ -1374,6 +1379,7 @@ var sortKey = 'mktValue';
 var sortDir = -1; // -1 = descending, 1 = ascending
 var hideAmounts = false;
 var anthropicKey = localStorage.getItem('vq_apikey') || '';
+var geminiKey    = localStorage.getItem('vq_geminikey') || '';
 var fmpKey       = localStorage.getItem('vq_fmpkey') || '';
 
 function anthropicUrl() {
@@ -1582,6 +1588,7 @@ async function fetchPrices() {
         var chg2   = Math.round((price2 - prev2) * 10000) / 10000;
         var chgP2  = prev2 ? Math.round((chg2 / prev2) * 100 * 100) / 100 : 0;
         prices[t] = { price: price2, change: chg2, changePct: chgP2, name: fmpResult.name, currency: isTSX ? 'CAD' : 'USD→CAD', stale: false, source: 'FMP' };
+        if (fmpResult.yield != null) divYields[t] = fmpResult.yield;
         gotPrice = true;
       }
     }
@@ -1601,6 +1608,8 @@ async function fetchPrices() {
           var change    = Math.round((price - prev) * 10000) / 10000;
           var changePct = prev ? Math.round((change / prev) * 100 * 100) / 100 : 0;
           prices[t] = { price: price, change: change, changePct: changePct, name: meta.longName || meta.shortName || t, currency: isTSX ? 'CAD' : 'USD→CAD', stale: false, source: 'Yahoo' };
+          var yld = meta.trailingAnnualDividendYield || meta.dividendYield || 0;
+          if (yld) divYields[t] = +(yld * 100).toFixed(2);
           gotPrice = true;
         } else {
           throw new Error('no price in Yahoo response');
@@ -1774,12 +1783,17 @@ function showKeyModal() {
   var modal = document.getElementById('keyModal');
   modal.style.display = 'flex';
   document.getElementById('keyInput').value = anthropicKey;
+  document.getElementById('geminiKeyInput').value = geminiKey;
   document.getElementById('fmpKeyInput').value = fmpKey;
   var wu = document.getElementById('workerUrlInput');
   if (wu) wu.value = localStorage.getItem('vq_worker_url') || '';
   var ws = document.getElementById('worker-status');
   if (ws) ws.textContent = localStorage.getItem('vq_worker_url') ? '✅ Worker configured' : 'Not configured — using public proxies';
-  document.getElementById('keyStatus').textContent = anthropicKey ? '✅ Anthropic key saved' + (fmpKey ? ' · FMP key saved' : '') : '';
+  var kParts = [];
+  if (geminiKey) kParts.push('✅ Gemini key saved');
+  if (anthropicKey) kParts.push('✅ Anthropic key saved');
+  if (fmpKey) kParts.push('✅ FMP key saved');
+  document.getElementById('keyStatus').textContent = kParts.join(' · ');
   document.getElementById('keyStatus').style.color = 'var(--green)';
 }
 
@@ -1799,6 +1813,8 @@ function saveKey() {
     }
     anthropicKey = key;
     localStorage.setItem('vq_apikey', key);
+    var gKey = document.getElementById('geminiKeyInput').value.trim();
+    if (gKey) { geminiKey = gKey; localStorage.setItem('vq_geminikey', gKey); msgs.push('Gemini key saved'); }
     msgs.push('Anthropic key saved');
   }
   if (fmpRaw) {
@@ -1909,10 +1925,15 @@ function renderAll() {
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain) + ' <span style="font-size:10px;color:var(--muted)">' + cpd(h.gainPct) + '</span>') + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.changePct||0) : cd(h.dayChange) + ' <span style="font-size:10px;color:var(--muted)">' + cpd(h.changePct||0) + '</span>') + '</td>' +
+          '<td style="font-size:12px;font-family:var(--fm);white-space:nowrap">' + (function(){
+            var y = divYields[h.ticker];
+            if (!y) return '<span style="color:var(--muted)">—</span>';
+            return '<span style="color:var(--accent2);font-weight:600">' + y.toFixed(2) + '%</span>';
+          })() + '</td>' +
           '<td style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (h.notes||'') + '</td>' +
           '</tr>';
       }).join('')
-    : '<tr><td colspan="8" class="empty">No holdings yet — add some in Holdings or Import</td></tr>';
+    : '<tr><td colspan="9" class="empty">No holdings yet — add some in Holdings or Import</td></tr>';
 
   // Holdings edit table
   document.getElementById('holdBody').innerHTML = data.length
@@ -2043,7 +2064,8 @@ async function fetchPriceFromFMP(ticker) {
       var q = Array.isArray(data) ? data[0] : data;
       if (!q || !q.price) continue;
       console.log('[Vestiq] FMP succeeded for ' + ticker);
-      return { price: q.price, prev: q.previousClose || q.price, name: q.name || ticker };
+      var yldVal = q.lastAnnualDividend && q.price ? +(q.lastAnnualDividend / q.price * 100).toFixed(2) : null;
+      return { price: q.price, prev: q.previousClose || q.price, name: q.name || ticker, yield: yldVal };
     } catch(e) { continue; }
   }
   return null;
@@ -2255,6 +2277,62 @@ function useChip(el) {
   sendAI();
 }
 
+
+// ── AI PROVIDER ABSTRACTION ──────────────────────────────────────────────
+// Uses Gemini if key is set (free), falls back to Anthropic
+async function callAI(systemPrompt, messages, maxTokens) {
+  maxTokens = maxTokens || 1000;
+
+  if (geminiKey) {
+    // Gemini Flash — free tier, 1500 req/day
+    // Merge system into first user message (Gemini doesn't have system role)
+    var geminiMsgs = messages.map(function(m) {
+      return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
+    });
+    // Prepend system prompt to first user message
+    if (geminiMsgs.length && geminiMsgs[0].role === 'user') {
+      geminiMsgs[0].parts[0].text = systemPrompt + '\n\n' + geminiMsgs[0].parts[0].text;
+    } else {
+      geminiMsgs.unshift({ role: 'user', parts: [{ text: systemPrompt }] });
+    }
+    var gResp = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + geminiKey,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: geminiMsgs,
+          generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 }
+        })
+      }
+    );
+    if (!gResp.ok) {
+      var err = await gResp.json().catch(function(){ return {}; });
+      throw new Error('Gemini error ' + gResp.status + ': ' + (err.error && err.error.message || gResp.statusText));
+    }
+    var gData = await gResp.json();
+    var gText = gData.candidates && gData.candidates[0] && gData.candidates[0].content &&
+                gData.candidates[0].content.parts && gData.candidates[0].content.parts[0] &&
+                gData.candidates[0].content.parts[0].text;
+    if (!gText) throw new Error('No text in Gemini response');
+    return gText;
+  }
+
+  if (anthropicKey) {
+    var aResp = await fetch(anthropicUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: maxTokens, system: systemPrompt, messages: messages })
+    });
+    var aData = await aResp.json();
+    var aText = (aData.content || []).filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('\n');
+    if (!aText) throw new Error('No text in Anthropic response');
+    return aText;
+  }
+
+  throw new Error('no_key');
+}
+
 async function sendAI() {
   var input = document.getElementById('aiInput');
   var q = input.value.trim();
@@ -2290,35 +2368,24 @@ async function sendAI() {
   aiHistory.push({ role: 'user', content: q });
 
   try {
-    if (!anthropicKey) {
+    if (!geminiKey && !anthropicKey) {
       document.getElementById(lid).remove();
-      box.innerHTML += '<div class="msg msg-a" style="color:var(--red)">⚠️ No API key set. Click the ⚙️ button in the header to add your Anthropic API key.</div>';
+      box.innerHTML += '<div class="msg msg-a" style="color:var(--red)">⚠️ No API key set. Click ⚙️ Settings and add a Gemini key (free) or Anthropic key.</div>';
       btn.disabled = false; btn.textContent = 'Ask →';
       box.scrollTop = box.scrollHeight;
       return;
     }
-    var resp = await fetch(anthropicUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: sys,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: aiHistory
-      })
-    });
-    var result = await resp.json();
-    var blocks = result.content || [];
-    var reply  = blocks.filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('\n') || 'No response received.';
+    var reply = await callAI(sys, aiHistory, 1000);
     aiHistory.push({ role: 'assistant', content: reply });
     var el = document.getElementById(lid);
     if (el) el.remove();
-    box.innerHTML += '<div class="msg msg-a">' + reply + '</div>';
+    var provider = geminiKey ? '<span style="font-size:10px;opacity:.5;float:right">Gemini</span>' : '<span style="font-size:10px;opacity:.5;float:right">Claude</span>';
+    box.innerHTML += '<div class="msg msg-a">' + provider + reply + '</div>';
   } catch(e) {
     var el = document.getElementById(lid);
     if (el) el.remove();
-    box.innerHTML += '<div class="msg msg-a" style="color:var(--red)">⚠️ Could not reach the AI. Check your internet connection.</div>';
+    var errMsg = e.message === 'no_key' ? '⚠️ No API key set. Click ⚙️ Settings.' : '⚠️ AI error: ' + e.message;
+    box.innerHTML += '<div class="msg msg-a" style="color:var(--red)">' + errMsg + '</div>';
   }
 
   btn.disabled = false; btn.textContent = 'Ask →';
@@ -3807,7 +3874,7 @@ function renderMarkdown(md, targetId) {
 
 // Check auto-generate every minute while app is open — only if key is set
 setInterval(function() {
-  if (!anthropicKey) return; // no key, nothing to do
+  if (!geminiKey && !anthropicKey) return; // no key, nothing to do
   var pane = document.getElementById('pane-reports');
   var isActive = pane && pane.classList.contains('active');
   if (isActive) updateNextReportInfo();
