@@ -80,35 +80,65 @@ jobs:
           Keep it under 350 words. Be specific. No fluff."
           fi
 
-          # Call Gemini API
-          RESPONSE=$(curl -s -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": $(echo "$PROMPT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}]}],
-              \"generationConfig\": {\"maxOutputTokens\": 600, \"temperature\": 0.7}
-            }")
+          # Call Gemini with retry on 429
+          REPORT_TEXT=""
+          for ATTEMPT in 1 2 3; do
+            echo "Attempt $ATTEMPT..."
+            RESPONSE=$(curl -s -X POST \
+              "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"contents\": [{\"role\": \"user\", \"parts\": [{\"text\": $(echo "$PROMPT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}]}],
+                \"generationConfig\": {\"maxOutputTokens\": 600, \"temperature\": 0.7}
+              }")
 
-          # Extract text from response
-          REPORT_TEXT=$(echo "$RESPONSE" | python3 -c "
+            IS_429=$(echo "$RESPONSE" | python3 -c "
+          import json,sys
+          d = json.load(sys.stdin)
+          print('yes' if d.get('error',{}).get('code') == 429 else 'no')
+          " 2>/dev/null || echo "no")
+
+            if [ "$IS_429" = "yes" ]; then
+              echo "Rate limited (429). Waiting 30s before retry..."
+              sleep 30
+              continue
+            fi
+
+            REPORT_TEXT=$(echo "$RESPONSE" | python3 -c "
           import json, sys
           d = json.load(sys.stdin)
           try:
               text = d['candidates'][0]['content']['parts'][0]['text']
               print(text)
           except Exception as e:
-              print('Error generating report: ' + str(e))
-              print('Raw response: ' + json.dumps(d)[:200])
-          ")
+              err = d.get('error', {})
+              print('ERROR: ' + err.get('message', str(e)))
+          " 2>/dev/null || echo "ERROR: failed to parse response")
 
-          echo "Generated report ($REPORT_TYPE):"
+            if [ -n "$REPORT_TEXT" ] && [[ "$REPORT_TEXT" != "ERROR:"* ]]; then
+              echo "Success on attempt $ATTEMPT"
+              break
+            fi
+
+            echo "Error response on attempt $ATTEMPT, waiting 15s..."
+            sleep 15
+          done
+
+          if [ -z "$REPORT_TEXT" ] || [[ "$REPORT_TEXT" == "ERROR:"* ]]; then
+            REPORT_TEXT="## Report Unavailable
+
+          Today's automated report could not be generated (Gemini API limit reached).
+
+          **Try again:** Trigger the workflow manually from the GitHub Actions tab in a few minutes."
+          fi
+
+          echo "--- Report preview ---"
           echo "$REPORT_TEXT" | head -5
 
-          # Save to Firebase
           REPORT_KEY="${TODAY}-${REPORT_TYPE}"
           ESCAPED_TEXT=$(echo "$REPORT_TEXT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
 
-          curl -s -X PATCH \
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH \
             "${FIREBASE_URL}/vestiq/reports/${REPORT_KEY}.json?auth=${FIREBASE_API_KEY}" \
             -H "Content-Type: application/json" \
             -d "{
@@ -118,6 +148,11 @@ jobs:
               \"generatedAt\": \"${NOW}\",
               \"auto\": true,
               \"model\": \"gemini-2.0-flash\"
-            }"
+            }")
 
-          echo "Report saved to Firebase under key: $REPORT_KEY"
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "Report saved to Firebase (key: $REPORT_KEY)"
+          else
+            echo "Firebase save returned HTTP $HTTP_STATUS"
+            exit 1
+          fi
