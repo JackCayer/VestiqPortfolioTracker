@@ -326,7 +326,8 @@ canvas + *{color:#e8eaf0 !important}
   canvas{ max-height:220px !important }
 
   .tbl th,.tbl td{ padding:7px 6px !important;font-size:11px !important }
-  #dashBody tr td:nth-child(9){ display:none }
+  #dashBody tr td:nth-child(9){ } /* yield col — keep visible */
+  #dashBody tr td:nth-child(10){ display:none } /* notes hidden on mobile */
 
   /* hide gif on mobile */
   #nyan-gif{ display:none !important }
@@ -370,7 +371,6 @@ canvas + *{color:#e8eaf0 !important}
   <button class="stab" id="stab-market" onclick="showTab('market')"><span class="stab-icon">🌍</span>Market</button>
   <button class="stab" id="stab-search" onclick="showTab('search')"><span class="stab-icon">🔍</span>Research</button>
   <button class="stab" id="stab-watchlist" onclick="showTab('watchlist')"><span class="stab-icon">👁</span>Watchlist</button>
-  <button class="stab" id="stab-ai" onclick="showTab('ai')"><span class="stab-icon">🤖</span>AI</button>
   <div class="stab-group-label">MANAGE</div>
   <button class="stab" id="stab-debug" onclick="showTab('debug')"><span class="stab-icon">🔧</span>Debug</button>
   <button class="stab" id="stab-txn" onclick="showTab('txn')"><span class="stab-icon">📋</span>Transactions</button>
@@ -413,7 +413,6 @@ canvas + *{color:#e8eaf0 !important}
   <button class="bnav-btn" id="bnav-holdings" onclick="showTab('holdings')"><span class="bicon">💼</span>Holdings</button>
   <button class="bnav-btn" id="bnav-charts" onclick="showTab('charts')"><span class="bicon">📈</span>Charts</button>
   <button class="bnav-btn" id="bnav-reports" onclick="showTab('reports')"><span class="bicon">📋</span>Reports</button>
-  <button class="bnav-btn" id="bnav-ai" onclick="showTab('ai')"><span class="bicon">🤖</span>AI</button>
   <button class="bnav-btn" id="bnav-more" onclick="toggleMoreDrawer()"><span class="bicon">☰</span>More</button>
 </div>
 
@@ -488,6 +487,7 @@ canvas + *{color:#e8eaf0 !important}
         <th onclick="setSort('mktValue')"  style="cursor:pointer" id="th-mktValue">Mkt Value ⇅</th>
         <th onclick="setSort('gain')"      style="cursor:pointer" id="th-gain">Gain ⇅</th>
         <th onclick="setSort('dayChange')" style="cursor:pointer" id="th-dayChange">Day P&amp;L ⇅</th>
+        <th>Yield</th>
         <th>Notes</th>
       </tr></thead>
       <tbody id="dashBody"></tbody>
@@ -515,47 +515,6 @@ canvas + *{color:#e8eaf0 !important}
   </div>
 </div>
 
-<!-- ══════════════ IMPORT ══════════════ -->
-<div id="pane-import" class="pane">
-  <div class="two-col" style="margin-bottom:18px">
-
-    <div class="card">
-      <div class="ctitle">📋 Import from Google Sheets</div>
-      <ol class="import-steps">
-        <li>Make sure your sheet columns are in order: <code>Ticker | Shares | Avg Cost</code> (no $ signs in the number cells)</li>
-        <li><strong style="color:var(--text)">Easiest method:</strong> Click the green <code>Share</code> button → set to <code>Anyone with the link</code> → copy the URL and paste it below</li>
-        <li><strong style="color:var(--text)">Alt method:</strong> <code>File → Share → Publish to web</code> → select sheet → choose <code>CSV</code> → Publish → copy URL</li>
-        <li>Both URL formats are supported — the app converts them automatically</li>
-      </ol>
-      <div class="flbl" style="margin-bottom:6px">Published CSV URL</div>
-      <input id="sheetsUrl" class="ifield" placeholder="https://docs.google.com/spreadsheets/d/..." style="margin-bottom:10px"/>
-      <button class="btn btn-a" onclick="importSheets()" style="width:100%">Import from Google Sheets</button>
-      <div id="sheetStatus" class="smsg"></div>
-    </div>
-
-    <div class="card">
-      <div class="ctitle">📝 Paste CSV Data</div>
-      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:14px;line-height:1.7">
-        Paste directly — one holding per line.<br>
-        Format: <code style="color:var(--accent2)">TICKER, SHARES, AVG_COST</code><br>
-        Header row is automatically skipped.
-      </p>
-      <div class="flbl" style="margin-bottom:6px">CSV Data</div>
-      <textarea id="csvPaste" class="ifield" placeholder="AAPL,10,180.00&#10;SPY,8,500.00&#10;VTI,15,240.00"></textarea>
-      <button class="btn btn-a" onclick="importCSV()" style="width:100%;margin-top:10px">Import CSV</button>
-      <div id="csvStatus" class="smsg"></div>
-    </div>
-
-  </div>
-
-  <div class="card">
-    <div class="ctitle">⚠️ Reset</div>
-    <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:14px">Clears all holdings stored in this browser. Use before importing a fresh dataset.</p>
-    <button class="btn btn-b" onclick="exportHoldingsCSV()" style="margin-bottom:10px;width:100%">📥 Export Holdings CSV</button>
-    <button class="btn-del" onclick="clearAll()">Clear All Holdings</button>
-  </div>
-</div>
-
 <!-- ══════════════ CHARTS ══════════════ -->
 <div id="pane-charts" class="pane">
   <div class="chart-grid">
@@ -571,192 +530,157 @@ canvas + *{color:#e8eaf0 !important}
   <div class="card" style="margin-top:18px"><div class="ctitle">Benchmark vs Portfolio</div><canvas id="cBench2" style="max-height:260px"></canvas></div>
 </div>
 
-<!-- ══════════════ AI ADVISOR ══════════════ -->
-<div id="pane-ai" class="pane">
+<!-- ══════════════ IMPORT ══════════════ -->
+<div id="pane-import" class="pane">
+  <div class="two-col" style="margin-bottom:18px">
+    <div class="card">
+      <div class="ctitle">📋 Import from CSV / Google Sheets</div>
+      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:14px">Paste a Google Sheets share URL or a CSV export URL below.</p>
+      <input id="sheetsUrl" class="ifield" placeholder="https://docs.google.com/spreadsheets/..." style="margin-bottom:10px"/>
+      <button class="btn btn-a" onclick="importSheets()" style="width:100%">Import from Sheets</button>
+      <div id="sheetStatus" style="margin-top:8px;font-size:12px;font-family:var(--fm)"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">📥 Paste CSV Directly</div>
+      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:14px">Format: <code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px">TICKER,SHARES,AVG_COST</code> — one per line.</p>
+      <textarea id="csvPaste" class="ifield" placeholder="AAPL,10,180.00&#10;SPY,8,500.00&#10;VTI,15,240.00" style="height:100px;resize:vertical;font-family:var(--fm);font-size:12px"></textarea>
+      <button class="btn btn-a" onclick="importCSV()" style="width:100%;margin-top:8px">Import CSV</button>
+      <div id="csvStatus" style="margin-top:8px;font-size:12px;font-family:var(--fm)"></div>
+    </div>
+  </div>
   <div class="card">
-    <div class="ctitle">🤖 AI Advisor — Powered by Claude</div>
-    <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:16px;line-height:1.7">
-      Claude knows your full portfolio and searches real-time news before answering. Ask anything.
+    <div class="ctitle">📋 Import Transactions CSV</div>
+    <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:10px">
+      Format: <code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px">DATE,TYPE,TICKER,SHARES,PRICE,AMOUNT,NOTES</code><br>
+      Types: BUY, SELL, DIV, CONT, WD, NRT
     </p>
-    <div id="noKeyWarning" style="display:none;background:rgba(200,240,74,.08);border:1px solid rgba(200,240,74,.2);border-radius:10px;padding:14px 16px;margin-bottom:16px;font-size:13px;font-family:var(--fm);color:#aaa">
-      ⚙️ No API key set — <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="showKeyModal()">click here to add your Anthropic API key</span> to enable the AI Advisor.
+    <textarea id="txnPaste" class="ifield" placeholder="2024-01-15,BUY,AAPL,10,180.00,1800.00&#10;2024-02-01,CONT,,,,,500.00" style="height:120px;resize:vertical;font-family:var(--fm);font-size:12px"></textarea>
+    <button class="btn btn-a" onclick="importTxnCSV()" style="width:100%;margin-top:8px">Import Transactions</button>
+    <div id="txnCsvStatus" style="margin-top:8px;font-size:12px;font-family:var(--fm)"></div>
+  </div>
+</div>
+
+<!-- ══════════════ CONTRIBUTIONS ══════════════ -->
+<div id="pane-contrib" class="pane">
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">💰 Log Contribution / Withdrawal</div>
+    <div class="form-row">
+      <div><div class="flbl">Date</div><input id="cont-date" class="ifield" type="date"/></div>
+      <div><div class="flbl">Amount ($)</div><input id="cont-amt" class="ifield" type="number" placeholder="500.00"/></div>
+      <div><div class="flbl">Type</div>
+        <select id="cont-type" class="ifield">
+          <option value="CONT">Contribution</option>
+          <option value="WD">Withdrawal</option>
+        </select>
+      </div>
+      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addContrib()">+ Add</button></div>
     </div>
-    <div class="chips">
-      <button class="chip" onclick="useChip(this)">What's my biggest risk right now?</button>
-      <button class="chip" onclick="useChip(this)">Any news affecting my holdings today?</button>
-      <button class="chip" onclick="useChip(this)">Which position should I consider trimming?</button>
-      <button class="chip" onclick="useChip(this)">Am I over-concentrated anywhere?</button>
-      <button class="chip" onclick="useChip(this)">Give me a full portfolio health check</button>
-      <button class="chip" onclick="useChip(this)">What sectors am I exposed to?</button>
+  </div>
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">📊 Contribution History</div>
+    <div style="overflow-x:auto">
+      <table class="tbl"><thead><tr><th>Date</th><th>Amount</th><th>Days Invested</th><th>Value Today (est.)</th><th>Return on this $</th><th></th></tr></thead>
+      <tbody id="contribBody"></tbody></table>
     </div>
-    <div class="ai-msgs" id="chatBox"></div>
-    <div class="ai-row">
-      <input id="aiInput" class="ifield" placeholder="Ask anything about your portfolio..."
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI();}"/>
-      <button class="btn btn-a" id="aiBtn" onclick="sendAI()">Ask →</button>
-    </div>
-    <div style="margin-top:8px;font-size:11px;color:var(--muted);font-family:var(--fm)">
-      Tip: Claude searches live news before responding — answers are specific to your positions
-    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">📈 Contribution Growth Chart</div>
+    <canvas id="cContrib" style="max-height:260px"></canvas>
   </div>
 </div>
 
 <!-- ══════════════ TRANSACTIONS ══════════════ -->
 <div id="pane-txn" class="pane">
-  <div class="two-col" style="margin-bottom:18px">
-    <div class="card">
-      <div class="ctitle">📋 Import Transaction Log</div>
-      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:14px">
-        Format: <code style="color:var(--accent2)">Date, Type, Ticker, Shares, Price_CAD, Amount_CAD, Notes</code><br>
-        Types: <code style="color:var(--accent2)">BUY SELL DIV CONT WD NRT</code>
-      </p>
-      <textarea id="txnPaste" class="ifield" rows="7" placeholder="2025-10-08,BUY,RY,0.0992,202.42,20.08,&#10;2025-10-09,DIV,RY,,,0.84,Dividend&#10;2025-11-13,SELL,ANIX,4.0000,,24.33,"></textarea>
-      <button class="btn btn-a" onclick="importTxnCSV()" style="width:100%;margin-top:10px">Import Transactions</button>
-      <div id="txnCsvStatus" class="smsg"></div>
-    </div>
-    <div class="card">
-      <div class="ctitle">📊 Transaction Summary</div>
-      <div id="txnSummary" style="font-family:var(--fm);font-size:13px;color:var(--muted);line-height:2">
-        No transactions imported yet.
-      </div>
-      <button class="btn btn-a" onclick="doRebuild()" style="margin-top:10px;width:100%">🔄 Rebuild Holdings from Transactions</button>
-      <button class="btn btn-b" onclick="clearTxns()" style="margin-top:10px;width:100%">Clear All Transactions</button>
-    </div>
-  </div>
-
   <div class="card" style="margin-bottom:18px">
-    <div class="ctitle">➕ Add Single Transaction</div>
-    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+    <div class="ctitle">➕ Add Transaction</div>
+    <div class="form-row" id="txnFormRow">
       <div><div class="flbl">Date</div><input id="txn-date" class="ifield" type="date"/></div>
       <div><div class="flbl">Type</div>
-        <select id="txn-type" class="ifield" style="padding:8px" onchange="updateTxnForm()">
+        <select id="txn-type" class="ifield" onchange="updateTxnForm()">
           <option value="BUY">BUY</option>
           <option value="SELL">SELL</option>
           <option value="DIV">DIV</option>
           <option value="CONT">CONT</option>
           <option value="WD">WD</option>
           <option value="NRT">NRT</option>
+          <option value="FPLINT">FPLINT</option>
         </select>
       </div>
-      <div id="txnf-ticker"><div class="flbl">Ticker</div><input id="txn-ticker" class="ifield" placeholder="e.g. RY" oninput="this.value=this.value.toUpperCase()"/></div>
-      <div id="txnf-shares"><div class="flbl">Shares</div><input id="txn-shares" class="ifield" type="number" placeholder="0.0000" step="0.0001"/></div>
-      <div id="txnf-price"><div class="flbl">Price</div><input id="txn-price" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
-      <div id="txnf-currency"><div class="flbl">Currency</div>
-        <select id="txn-usd" class="ifield" style="padding:8px">
-          <option value="cad">CAD</option>
-          <option value="usd">USD</option>
-        </select>
-      </div>
-      <div id="txnf-fx"><div class="flbl">FX Rate</div><input id="txn-fx" class="ifield" type="number" placeholder="e.g. 1.42" step="0.0001" style="width:100px"/></div>
-      <div id="txnf-amount"><div class="flbl">Amount (CAD)</div><input id="txn-amount" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
+      <div id="txn-ticker-wrap"><div class="flbl">Ticker</div><input id="txn-ticker" class="ifield" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div id="txn-shares-wrap"><div class="flbl">Shares</div><input id="txn-shares" class="ifield" type="number" placeholder="10"/></div>
+      <div id="txn-price-wrap"><div class="flbl">Price ($)</div><input id="txn-price" class="ifield" type="number" placeholder="180.00"/></div>
+      <div><div class="flbl">Amount ($)</div><input id="txn-amount" class="ifield" type="number" placeholder="1800.00"/></div>
+      <div><div class="flbl">Notes</div><input id="txn-notes" class="ifield" placeholder="optional"/></div>
+      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addTxn()">+ Add</button></div>
     </div>
-    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-      <div style="flex:1"><div class="flbl">Notes (optional)</div><input id="txn-notes" class="ifield" placeholder="optional"/></div>
-      <button class="btn btn-a" onclick="addSingleTxn()" style="white-space:nowrap;padding:10px 20px">+ Add</button>
-    </div>
-    <div id="txnAddStatus" class="smsg"></div>
   </div>
-
-  <div class="card" style="margin-bottom:18px">
-    <div class="ctitle">📈 Per-Holding Lot Breakdown</div>
-    <div id="lotBreakdown" style="font-size:13px;color:var(--muted);font-family:var(--fm)">Import transactions to see lot-by-lot cost basis.</div>
-  </div>
-
-  <div class="card" style="overflow-x:auto">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px">
-      <div class="ctitle" style="margin:0">All Transactions</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="sort-btn on" id="txf-all"  onclick="setTxFilter('all')">All</button>
-        <button class="sort-btn"    id="txf-BUY"  onclick="setTxFilter('BUY')">Buys</button>
-        <button class="sort-btn"    id="txf-SELL" onclick="setTxFilter('SELL')">Sells</button>
-        <button class="sort-btn"    id="txf-DIV"  onclick="setTxFilter('DIV')">Dividends</button>
-        <button class="sort-btn"    id="txf-CONT" onclick="setTxFilter('CONT')">Contributions</button>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <span style="font-size:10px;color:var(--muted);font-family:var(--fm);text-transform:uppercase;letter-spacing:1px">Ticker</span>
-      <select id="txTickerSel" onchange="setTxTicker(this.value)" style="background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 8px;font-size:12px;font-family:var(--fm)">
-        <option value="all">All Tickers</option>
+  <div class="card">
+    <div class="ctitle">📋 Transaction Log</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      <input id="txn-filter-ticker" class="ifield" placeholder="Filter ticker..." style="max-width:140px" oninput="renderTxns()"/>
+      <select id="txn-filter-type" class="ifield" style="max-width:120px" onchange="renderTxns()">
+        <option value="">All types</option>
+        <option value="BUY">BUY</option><option value="SELL">SELL</option>
+        <option value="DIV">DIV</option><option value="CONT">CONT</option>
+        <option value="WD">WD</option><option value="NRT">NRT</option>
+      </select>
+      <select id="txn-sort" class="ifield" style="max-width:140px" onchange="renderTxns()">
+        <option value="date-desc">Date ↓</option>
+        <option value="date-asc">Date ↑</option>
+        <option value="amount-desc">Amount ↓</option>
+        <option value="ticker-asc">Ticker A-Z</option>
       </select>
     </div>
-    <table class="tbl">
-      <thead><tr>
-        <th onclick="setTxSort('date')"   style="cursor:pointer">Date <span id="txsh-date">⇅</span></th>
-        <th onclick="setTxSort('type')"   style="cursor:pointer">Type <span id="txsh-type">⇅</span></th>
-        <th onclick="setTxSort('ticker')" style="cursor:pointer">Ticker <span id="txsh-ticker">⇅</span></th>
-        <th onclick="setTxSort('shares')" style="cursor:pointer">Shares <span id="txsh-shares">⇅</span></th>
-        <th onclick="setTxSort('price')"  style="cursor:pointer">Price <span id="txsh-price">⇅</span></th>
-        <th onclick="setTxSort('amount')" style="cursor:pointer">Amount <span id="txsh-amount">⇅</span></th>
-        <th>Notes</th>
-        <th></th>
-      </tr></thead>
-      <tbody id="txnBody"></tbody>
-    </table>
+    <div style="overflow-x:auto">
+      <table class="tbl"><thead><tr><th>Date</th><th>Type</th><th>Ticker</th><th>Shares</th><th>Price</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
+      <tbody id="txnBody"></tbody></table>
+    </div>
   </div>
 </div>
 
 <!-- ══════════════ DIVIDENDS ══════════════ -->
 <div id="pane-div" class="pane">
-  <div class="stat-grid" style="margin-bottom:22px">
-    <div class="stat"><div class="slbl">Total Dividends</div><div class="sval" id="dv-total">—</div><div class="ssub" id="dv-count">from transaction log</div></div>
-    <div class="stat"><div class="slbl">Best Payer</div><div class="sval" id="dv-best">—</div><div class="ssub" id="dv-best-sub">highest total received</div></div>
-    <div class="stat"><div class="slbl">Avg Monthly Income</div><div class="sval" id="dv-monthly">—</div><div class="ssub" id="dv-monthly-sub">since first dividend</div></div>
-    <div class="stat"><div class="slbl">Tickers Paying</div><div class="sval" id="dv-tickers">—</div><div class="ssub">unique dividend payers</div></div>
-  </div>
-
-  <div class="section-hdr" style="margin-bottom:14px">Dividend Income by Ticker</div>
-  <div class="two-col" style="margin-bottom:22px">
-    <div class="card"><div style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:10px">Income by Ticker</div><canvas id="cDividends" style="max-height:200px !important"></canvas></div>
-    <div class="card"><div style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:10px">Income by Month</div><canvas id="cDivMonthly" style="max-height:200px !important"></canvas></div>
-  </div>
-
-  <div class="card" style="overflow-x:auto">
-    <div class="ctitle">Dividend History</div>
-    <table class="tbl">
-      <thead><tr><th>Ticker</th><th>Total Received</th><th>Payments</th><th>Last Payment</th><th>Avg per Payment</th><th>Est. Annual Yield</th></tr></thead>
-      <tbody id="divBody"></tbody>
-    </table>
-  </div>
-
-  <div class="card" style="margin-top:18px;margin-bottom:18px">
-    <div class="ctitle">➕ Add Dividend Payment Manually</div>
-    <div class="form-row" style="grid-template-columns:130px 1fr 120px 120px auto;gap:10px">
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">💵 Log Dividend</div>
+    <div class="form-row">
       <div><div class="flbl">Date</div><input id="div-date" class="ifield" type="date"/></div>
-      <div><div class="flbl">Ticker</div><input id="div-ticker" class="ifield" placeholder="e.g. RY" oninput="this.value=this.value.toUpperCase()"/></div>
-      <div><div class="flbl">Amount (CAD)</div><input id="div-amount" class="ifield" type="number" placeholder="0.00" step="0.01"/></div>
-      <div><div class="flbl">FX Rate (if USD div)</div><input id="div-fx" class="ifield" type="number" placeholder="e.g. 1.42" step="0.0001"/></div>
-      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addManualDiv()">+ Add</button></div>
+      <div><div class="flbl">Ticker</div><input id="div-ticker" class="ifield" placeholder="ENB" oninput="this.value=this.value.toUpperCase()"/></div>
+      <div><div class="flbl">Amount ($)</div><input id="div-amount" class="ifield" type="number" placeholder="25.00"/></div>
+      <div><div class="flbl">Notes</div><input id="div-notes" class="ifield" placeholder="Q1 dividend"/></div>
+      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addDividend()">+ Add</button></div>
     </div>
-    <div id="divAddStatus" class="smsg"></div>
   </div>
-
-  <div class="card" style="margin-top:0px;overflow-x:auto">
-    <div class="ctitle" style="margin-bottom:14px">📅 Dividend Calendar</div>
-    <div id="divCalendar" style="overflow-x:auto;margin-bottom:22px"></div>
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">📊 Dividend Summary by Ticker</div>
+    <div style="overflow-x:auto">
+      <table class="tbl" id="divTable">
+        <thead><tr id="divHead"><th>Ticker</th><th>Total Received</th><th>Payments</th><th>Last Payment</th><th>Avg per Payment</th><th>Est. Annual Yield</th></tr></thead>
+        <tbody id="divBody"></tbody>
+      </table>
+    </div>
   </div>
-  <div class="card" style="margin-top:0px;overflow-x:auto">
-    <div class="ctitle">All Dividend Payments</div>
-    <table class="tbl">
-      <thead><tr><th>Date</th><th>Ticker</th><th>Amount</th><th>Notes</th></tr></thead>
-      <tbody id="divHistBody"></tbody>
-    </table>
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">📅 Dividend Calendar</div>
+    <canvas id="cDivChart" style="max-height:260px"></canvas>
+  </div>
+  <div class="card">
+    <div class="ctitle">📋 Dividend Log</div>
+    <div style="overflow-x:auto">
+      <table class="tbl"><thead><tr><th>Date</th><th>Ticker</th><th>Amount</th><th>Notes</th></tr></thead>
+      <tbody id="divLogBody"></tbody></table>
+    </div>
   </div>
 </div>
 
 <!-- ══════════════ REALIZED GAINS ══════════════ -->
 <div id="pane-realized" class="pane">
-  <div class="stat-grid" style="margin-bottom:22px">
-    <div class="stat"><div class="slbl">Total Realized</div><div class="sval" id="rz-total">—</div><div class="ssub" id="rz-sub">from closed positions</div></div>
-    <div class="stat"><div class="slbl">Best Trade</div><div class="sval" id="rz-best">—</div><div class="ssub" id="rz-best-sub">—</div></div>
-    <div class="stat"><div class="slbl">Worst Trade</div><div class="sval" id="rz-worst">—</div><div class="ssub" id="rz-worst-sub">—</div></div>
-    <div class="stat"><div class="slbl">Win Rate</div><div class="sval" id="rz-winrate">—</div><div class="ssub" id="rz-winrate-sub">profitable closes</div></div>
-  </div>
-  <div class="card" style="overflow-x:auto">
-    <div class="ctitle">Closed Positions</div>
-    <table class="tbl">
-      <thead><tr><th>Ticker</th><th>Shares Sold</th><th>Avg Cost</th><th>Sell Price</th><th>Gain $</th><th>Gain %</th><th>Date</th></tr></thead>
-      <tbody id="rzBody"></tbody>
-    </table>
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">💹 Realized Gains / Losses</div>
+    <div id="realizedSummary" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-family:var(--fm);font-size:13px"></div>
+    <div style="overflow-x:auto">
+      <table class="tbl"><thead><tr><th>Ticker</th><th>Shares Sold</th><th>Avg Cost</th><th>Sell Price</th><th>Gain $</th><th>Gain %</th><th>Date</th></tr></thead>
+      <tbody id="realizedBody"></tbody></table>
+    </div>
   </div>
 </div>
 
@@ -782,10 +706,8 @@ canvas + *{color:#e8eaf0 !important}
 
 <!-- ══════════════ MARKET OVERVIEW ══════════════ -->
 <div id="pane-market" class="pane">
-
-  <!-- Stat row: key indices -->
   <div class="stat-grid" id="mkt-index-grid" style="margin-bottom:22px">
-    <div class="stat"><div class="slbl">S&P 500</div><div class="sval" id="mkt-spy">—</div><div class="ssub" id="mkt-spy-sub">loading…</div></div>
+    <div class="stat"><div class="slbl">S&amp;P 500</div><div class="sval" id="mkt-spy">—</div><div class="ssub" id="mkt-spy-sub">loading…</div></div>
     <div class="stat"><div class="slbl">Nasdaq 100</div><div class="sval" id="mkt-qqq">—</div><div class="ssub" id="mkt-qqq-sub">loading…</div></div>
     <div class="stat"><div class="slbl">TSX Composite</div><div class="sval" id="mkt-tsx">—</div><div class="ssub" id="mkt-tsx-sub">loading…</div></div>
     <div class="stat"><div class="slbl">CAD / USD</div><div class="sval" id="mkt-fx">—</div><div class="ssub" id="mkt-fx-sub">exchange rate</div></div>
@@ -796,508 +718,108 @@ canvas + *{color:#e8eaf0 !important}
     <div class="stat"><div class="slbl">10Y US Treasury</div><div class="sval" id="mkt-bond">—</div><div class="ssub" id="mkt-bond-sub">yield</div></div>
     <div class="stat"><div class="slbl">VIX (Fear Index)</div><div class="sval" id="mkt-vix">—</div><div class="ssub" id="mkt-vix-sub">volatility</div></div>
   </div>
-
-  <!-- Charts row -->
   <div class="two-col" style="margin-bottom:22px">
     <div class="card"><div class="ctitle">Major Indices — 3 Month</div><canvas id="cMktIndices" style="max-height:220px"></canvas></div>
     <div class="card"><div class="ctitle">Commodities — 3 Month</div><canvas id="cMktCommodities" style="max-height:220px"></canvas></div>
   </div>
-
-  <!-- Sector heatmap -->
   <div class="card" style="margin-bottom:22px">
     <div class="ctitle">Sector Performance Today</div>
     <div id="mktSectors" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:10px"></div>
   </div>
-
-  <!-- Your holdings vs market -->
   <div class="card">
     <div class="ctitle">Your Holdings vs Market Today</div>
     <div id="mktHoldingsVsMarket" style="margin-top:10px;overflow-x:auto"></div>
   </div>
-
 </div>
 
-<!-- ══════════════ RESEARCH / STOCK LOOKUP ══════════════ -->
+<!-- ══════════════ RESEARCH ══════════════ -->
 <div id="pane-search" class="pane">
-
-  <!-- Search bar -->
-  <div class="card" style="margin-bottom:22px">
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <input id="srch-input" class="ifield" style="flex:1;min-width:160px;font-size:15px;letter-spacing:1px"
-        placeholder="Ticker symbol e.g. AAPL, RY.TO…"
-        oninput="this.value=this.value.toUpperCase()"
-        onkeydown="if(event.key==='Enter')searchStock()"/>
-      <button class="btn btn-a" onclick="searchStock()" style="padding:10px 24px">Search</button>
-      <div id="srch-status" style="font-size:12px;color:var(--muted);font-family:var(--fm)"></div>
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">🔍 Stock Lookup</div>
+    <div class="form-row">
+      <div style="flex:1"><div class="flbl">Ticker</div><input id="res-ticker" class="ifield" placeholder="e.g. AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter') lookupStock()"/></div>
+      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="lookupStock()">Look Up</button></div>
     </div>
-    <!-- Quick links for owned tickers -->
-    <div id="srch-owned" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px"></div>
+    <div id="resResult" style="margin-top:16px"></div>
   </div>
-
-  <!-- Screener -->
-  <div class="card" style="margin-bottom:22px">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-      <div class="ctitle" style="margin:0">Screen Stocks</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="sort-btn on" id="scr-preset-divgrowth" onclick="applyScreenerPreset('divgrowth')">Dividend Growth</button>
-        <button class="sort-btn" id="scr-preset-value"      onclick="applyScreenerPreset('value')">Value</button>
-        <button class="sort-btn" id="scr-preset-momentum"   onclick="applyScreenerPreset('momentum')">Momentum</button>
-        <button class="sort-btn" id="scr-preset-tsxblue"    onclick="applyScreenerPreset('tsxblue')">TSX Blue Chip</button>
-        <button class="sort-btn" id="scr-preset-growth"     onclick="applyScreenerPreset('growth')">Growth</button>
-        <button class="sort-btn" id="scr-preset-clear"      onclick="applyScreenerPreset('clear')">Clear</button>
-      </div>
+  <div class="card">
+    <div class="ctitle">📊 Stock Screener</div>
+    <div id="scr-status" style="font-size:12px;font-family:var(--fm);margin-bottom:12px;color:var(--muted)"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="sort-btn" id="scr-preset-divgrowth" onclick="applyScreenerPreset('divgrowth')">Div Growth</button>
+      <button class="sort-btn" id="scr-preset-value" onclick="applyScreenerPreset('value')">Value</button>
+      <button class="sort-btn" id="scr-preset-momentum" onclick="applyScreenerPreset('momentum')">Momentum</button>
+      <button class="sort-btn" id="scr-preset-tsxblue" onclick="applyScreenerPreset('tsxblue')">TSX Blue Chip</button>
+      <button class="sort-btn" id="scr-preset-growth" onclick="applyScreenerPreset('growth')">Growth</button>
+      <button class="sort-btn" id="scr-preset-clear" onclick="applyScreenerPreset('clear')">Clear</button>
     </div>
-
-    <!-- Filter grid -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:14px">
-
-      <!-- Exchange -->
-      <div>
-        <div class="flbl">Exchange</div>
-        <select id="scr-exchange" class="ifield" style="font-size:12px">
-          <option value="">Any</option>
-          <option value="tsx">TSX (Canada)</option>
-          <option value="nyse">NYSE (US)</option>
-          <option value="nasdaq">NASDAQ (US)</option>
-        </select>
-      </div>
-
-      <!-- Sector -->
-      <div>
-        <div class="flbl">Sector</div>
-        <select id="scr-sector" class="ifield" style="font-size:12px">
-          <option value="">Any</option>
-          <option value="Technology">Technology</option>
-          <option value="Financial Services">Financial Services</option>
-          <option value="Energy">Energy</option>
-          <option value="Healthcare">Healthcare</option>
-          <option value="Industrials">Industrials</option>
-          <option value="Consumer Defensive">Consumer Defensive</option>
-          <option value="Consumer Cyclical">Consumer Cyclical</option>
-          <option value="Utilities">Utilities</option>
-          <option value="Real Estate">Real Estate</option>
-          <option value="Basic Materials">Basic Materials</option>
-          <option value="Communication Services">Communication Services</option>
-        </select>
-      </div>
-
-      <!-- Market Cap -->
-      <div>
-        <div class="flbl">Market Cap</div>
-        <select id="scr-mktcap" class="ifield" style="font-size:12px">
-          <option value="">Any</option>
-          <option value="mega">Mega (>$200B)</option>
-          <option value="large">Large ($10B–$200B)</option>
-          <option value="mid">Mid ($2B–$10B)</option>
-          <option value="small">Small ($300M–$2B)</option>
-          <option value="micro">Micro (<$300M)</option>
-        </select>
-      </div>
-
-      <!-- P/E Ratio -->
-      <div>
-        <div class="flbl">P/E Ratio</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="scr-pe-min" class="ifield" type="number" placeholder="Min" style="font-size:12px;width:70px"/>
-          <span style="color:var(--muted);font-size:12px">–</span>
-          <input id="scr-pe-max" class="ifield" type="number" placeholder="Max" style="font-size:12px;width:70px"/>
-        </div>
-      </div>
-
-      <!-- Dividend Yield -->
-      <div>
-        <div class="flbl">Dividend Yield %</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="scr-yield-min" class="ifield" type="number" placeholder="Min" step="0.1" style="font-size:12px;width:70px"/>
-          <span style="color:var(--muted);font-size:12px">–</span>
-          <input id="scr-yield-max" class="ifield" type="number" placeholder="Max" step="0.1" style="font-size:12px;width:70px"/>
-        </div>
-      </div>
-
-      <!-- Price -->
-      <div>
-        <div class="flbl">Price (local currency)</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="scr-price-min" class="ifield" type="number" placeholder="Min $" style="font-size:12px;width:70px"/>
-          <span style="color:var(--muted);font-size:12px">–</span>
-          <input id="scr-price-max" class="ifield" type="number" placeholder="Max $" style="font-size:12px;width:70px"/>
-        </div>
-      </div>
-
-      <!-- 52W Performance -->
-      <div>
-        <div class="flbl">52W Return %</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="scr-ret-min" class="ifield" type="number" placeholder="Min %" style="font-size:12px;width:70px"/>
-          <span style="color:var(--muted);font-size:12px">–</span>
-          <input id="scr-ret-max" class="ifield" type="number" placeholder="Max %" style="font-size:12px;width:70px"/>
-        </div>
-      </div>
-
-      <!-- Beta -->
-      <div>
-        <div class="flbl">Beta</div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <input id="scr-beta-min" class="ifield" type="number" placeholder="Min" step="0.1" style="font-size:12px;width:70px"/>
-          <span style="color:var(--muted);font-size:12px">–</span>
-          <input id="scr-beta-max" class="ifield" type="number" placeholder="Max" step="0.1" style="font-size:12px;width:70px"/>
-        </div>
-      </div>
-
-      <!-- Sort by -->
-      <div>
-        <div class="flbl">Sort By</div>
-        <select id="scr-sortby" class="ifield" style="font-size:12px">
-          <option value="marketCap">Market Cap</option>
-          <option value="trailingPE">P/E Ratio</option>
-          <option value="dividendYield">Dividend Yield</option>
-          <option value="52wReturn">52W Return</option>
-          <option value="price">Price</option>
-          <option value="beta">Beta</option>
-        </select>
-      </div>
-
-      <!-- Sort dir -->
-      <div>
-        <div class="flbl">Order</div>
-        <select id="scr-sortdir" class="ifield" style="font-size:12px">
-          <option value="desc">High → Low</option>
-          <option value="asc">Low → High</option>
-        </select>
-      </div>
-
+    <div class="form-row" style="flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div><div class="flbl">Exchange</div><select id="scr-exchange" class="ifield"><option value="">All</option><option value="tsx">TSX</option><option value="nyse">NYSE</option><option value="nasdaq">Nasdaq</option></select></div>
+      <div><div class="flbl">Sector</div><select id="scr-sector" class="ifield"><option value="">All</option><option>Energy</option><option>Financials</option><option>Technology</option><option>Healthcare</option><option>Industrials</option><option>Materials</option><option>Utilities</option><option>Real Estate</option><option>Consumer Discretionary</option><option>Consumer Staples</option><option>Communication Services</option></select></div>
+      <div><div class="flbl">Mkt Cap</div><select id="scr-mktcap" class="ifield"><option value="">Any</option><option value="large">Large (&gt;$10B)</option><option value="mid">Mid ($2-10B)</option><option value="small">Small (&lt;$2B)</option></select></div>
+      <div><div class="flbl">P/E Min</div><input id="scr-pe-min" class="ifield" type="number" placeholder="5" style="width:80px"/></div>
+      <div><div class="flbl">P/E Max</div><input id="scr-pe-max" class="ifield" type="number" placeholder="30" style="width:80px"/></div>
+      <div><div class="flbl">Yield Min %</div><input id="scr-yield-min" class="ifield" type="number" placeholder="2" style="width:80px"/></div>
+      <div><div class="flbl">Yield Max %</div><input id="scr-yield-max" class="ifield" type="number" placeholder="10" style="width:80px"/></div>
+      <div><div class="flbl">52W Ret Min %</div><input id="scr-ret-min" class="ifield" type="number" placeholder="10" style="width:80px"/></div>
+      <div><div class="flbl">Beta Max</div><input id="scr-beta-max" class="ifield" type="number" placeholder="1.5" style="width:80px"/></div>
+      <div><div class="flbl">Sort By</div><select id="scr-sortby" class="ifield"><option value="marketCap">Mkt Cap</option><option value="trailingPE">P/E</option><option value="dividendYield">Yield</option><option value="52wReturn">52W Return</option><option value="beta">Beta</option></select></div>
+      <div><div class="flbl">Order</div><select id="scr-sortdir" class="ifield"><option value="desc">↓ High</option><option value="asc">↑ Low</option></select></div>
     </div>
-
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-a" onclick="runScreener()" style="padding:10px 28px">Run Screen</button>
-      <div id="scr-status" style="font-size:12px;color:var(--muted);font-family:var(--fm)"></div>
+    <button class="btn btn-a" onclick="runScreener()" style="margin-bottom:16px">▶ Run Screener</button>
+    <div id="scr-results" style="display:none;overflow-x:auto">
+      <table class="tbl"><thead><tr id="scr-thead"></tr></thead><tbody id="scr-tbody"></tbody></table>
     </div>
-
-    <!-- Results table -->
-    <div id="scr-results" style="display:none;margin-top:16px;overflow-x:auto">
-      <table class="tbl" style="font-size:12px">
-        <thead><tr id="scr-thead"></tr></thead>
-        <tbody id="scr-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Results — hidden until search -->
-  <div id="srch-results" style="display:none">
-
-    <!-- Company header -->
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:22px">
-      <div>
-        <div style="display:flex;align-items:baseline;gap:12px;flex-wrap:wrap">
-          <span id="sr-ticker" style="font-size:28px;font-weight:800;font-family:var(--fh);color:var(--accent)"></span>
-          <span id="sr-name"   style="font-size:15px;color:var(--muted)"></span>
-          <span id="sr-exchange" style="font-size:11px;font-family:var(--fm);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:4px;padding:2px 7px;color:var(--muted)"></span>
-        </div>
-        <div id="sr-sector" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
-      </div>
-      <div style="text-align:right">
-        <div id="sr-price"  style="font-size:32px;font-weight:800;font-family:var(--fm)"></div>
-        <div id="sr-change" style="font-size:14px;font-family:var(--fm)"></div>
-        <div id="sr-currency" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
-      </div>
-    </div>
-
-    <!-- Key stats row -->
-    <div class="stat-grid" style="margin-bottom:22px">
-      <div class="stat"><div class="slbl">Market Cap</div><div class="sval" id="sr-mktcap">—</div></div>
-      <div class="stat"><div class="slbl">P/E Ratio</div><div class="sval" id="sr-pe">—</div><div class="ssub" id="sr-pe-sub"></div></div>
-      <div class="stat"><div class="slbl">Div Yield</div><div class="sval" id="sr-yield">—</div><div class="ssub" id="sr-yield-sub"></div></div>
-      <div class="stat"><div class="slbl">52W Range</div><div class="sval" id="sr-52w">—</div><div class="ssub" id="sr-52w-sub"></div></div>
-    </div>
-    <div class="stat-grid" style="margin-bottom:22px">
-      <div class="stat"><div class="slbl">EPS (TTM)</div><div class="sval" id="sr-eps">—</div></div>
-      <div class="stat"><div class="slbl">Revenue (TTM)</div><div class="sval" id="sr-rev">—</div></div>
-      <div class="stat"><div class="slbl">Profit Margin</div><div class="sval" id="sr-margin">—</div></div>
-      <div class="stat"><div class="slbl">Beta</div><div class="sval" id="sr-beta">—</div><div class="ssub">vs market</div></div>
-    </div>
-
-    <!-- Price chart with range selector -->
-    <div class="card" style="margin-bottom:22px">
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-        <div class="ctitle" style="margin:0" id="sr-chart-title">Price Chart</div>
-        <div style="display:flex;gap:6px">
-          <button class="sort-btn on" id="srng-1mo" onclick="setSrRange('1mo','1d')">1M</button>
-          <button class="sort-btn"    id="srng-3mo" onclick="setSrRange('3mo','1d')">3M</button>
-          <button class="sort-btn"    id="srng-6mo" onclick="setSrRange('6mo','1wk')">6M</button>
-          <button class="sort-btn"    id="srng-1y"  onclick="setSrRange('1y','1wk')">1Y</button>
-          <button class="sort-btn"    id="srng-2y"  onclick="setSrRange('2y','1mo')">2Y</button>
-          <button class="sort-btn"    id="srng-5y"  onclick="setSrRange('5y','1mo')">5Y</button>
-        </div>
-      </div>
-      <canvas id="cSrPrice" style="max-height:260px"></canvas>
-    </div>
-
-    <!-- Description + financials -->
-    <div class="two-col" style="margin-bottom:22px">
-      <div class="card">
-        <div class="ctitle">About</div>
-        <div id="sr-desc" style="font-size:12px;color:var(--muted);line-height:1.7;max-height:160px;overflow-y:auto"></div>
-      </div>
-      <div class="card">
-        <div class="ctitle">Financials</div>
-        <table class="tbl" style="font-size:12px">
-          <tbody id="sr-financials"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Watchlist button -->
-    <div id="sr-watchlist-row" style="display:none;margin-bottom:16px">
-      <button id="sr-wl-btn" class="btn btn-a" onclick="toggleWatchlist()" style="width:100%"></button>
-    </div>
-
-    <!-- In your portfolio? -->
-    <div id="sr-in-portfolio" style="display:none" class="card">
-      <div class="ctitle">Your Position</div>
-      <div id="sr-portfolio-details"></div>
-    </div>
-
   </div>
 </div>
 
 <!-- ══════════════ WATCHLIST ══════════════ -->
 <div id="pane-watchlist" class="pane">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
-    <div class="ctitle" style="margin:0">Watchlist</div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input id="wl-add-input" class="ifield" style="width:140px;font-size:13px;letter-spacing:1px" placeholder="Add ticker…"
-        oninput="this.value=this.value.toUpperCase()"
-        onkeydown="if(event.key==='Enter')addToWatchlistDirect()"/>
-      <button class="btn btn-a" onclick="addToWatchlistDirect()" style="padding:8px 16px">+ Add</button>
-      <button class="btn btn-b" onclick="refreshWatchlist()" style="padding:8px 16px">↻ Refresh</button>
-    </div>
-  </div>
-  <div id="wl-empty" style="text-align:center;padding:60px 20px;color:var(--muted)">
-    <div style="font-size:32px;margin-bottom:12px">👁</div>
-    <div style="font-size:14px">No stocks on your watchlist yet.</div>
-    <div style="font-size:12px;margin-top:6px">Search for a stock in the Research tab and click "Add to Watchlist".</div>
-  </div>
-  <div id="wl-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px"></div>
-</div>
-
-<!-- ══════════════ DAILY REPORTS ══════════════ -->
-<div id="pane-reports" class="pane">
-
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
-    <div>
-      <div class="ctitle" style="margin:0">📋 Daily Reports</div>
-      <div id="rpt-next-info" style="font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--fm)"></div>
-    </div>
-    <div style="font-size:11px;color:var(--muted);font-family:var(--fm);background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:7px 14px">
-      ⏰ Reports generated automatically via GitHub Actions at <strong style="color:var(--accent)">9:00 AM</strong> and <strong style="color:var(--accent)">4:00 PM ET</strong> on weekdays
-    </div>
-  </div>
-
-  <!-- Report Settings (collapsible) -->
-  <div class="card" style="margin-bottom:20px">
-    <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer" onclick="toggleRptSettings()">
-      <div style="font-size:13px;font-weight:700;color:var(--accent2)">⚙️ Report Settings</div>
-      <div id="rpt-settings-arrow" style="color:var(--muted);font-size:12px;transition:transform .2s">▼</div>
-    </div>
-    <div id="rpt-settings-body" style="display:none;margin-top:16px">
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" class="two-col">
-        <div>
-          <div class="flbl" style="margin-bottom:6px">Analyst Focus</div>
-          <div style="display:flex;flex-direction:column;gap:6px" id="rpt-focus-options">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
-              <input type="checkbox" id="rpt-focus-analysis" checked onchange="saveRptSettings()"> Explain <em>why</em> stocks moved (causes & catalysts)
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
-              <input type="checkbox" id="rpt-focus-suggestions" checked onchange="saveRptSettings()"> Actionable suggestions for my holdings
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
-              <input type="checkbox" id="rpt-focus-macro" checked onchange="saveRptSettings()"> Macro context (interest rates, inflation, BoC/Fed)
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
-              <input type="checkbox" id="rpt-focus-dividends" checked onchange="saveRptSettings()"> Dividend & income focus for my holdings
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
-              <input type="checkbox" id="rpt-focus-technical" onchange="saveRptSettings()"> Technical levels (support/resistance, moving averages)
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
-              <input type="checkbox" id="rpt-focus-sentiment" onchange="saveRptSettings()"> Market sentiment & investor psychology
-            </label>
-          </div>
-        </div>
-        <div>
-          <div class="flbl" style="margin-bottom:6px">Report Style</div>
-          <select id="rpt-style" class="ifield" style="font-size:12px;margin-bottom:12px" onchange="saveRptSettings()">
-            <option value="analytical">Analytical — deep explanations of why</option>
-            <option value="concise">Concise — bullet-point summary</option>
-            <option value="narrative">Narrative — story-like writeup</option>
-            <option value="advisor">Personal Advisor — talk to me directly</option>
-          </select>
-          <div class="flbl" style="margin-bottom:6px">Tone</div>
-          <select id="rpt-tone" class="ifield" style="font-size:12px" onchange="saveRptSettings()">
-            <option value="professional">Professional</option>
-            <option value="conversational">Conversational</option>
-            <option value="cautious">Cautious / risk-aware</option>
-            <option value="optimistic">Optimistic / opportunity-focused</option>
-          </select>
-        </div>
-      </div>
-
-      <div style="margin-bottom:16px">
-        <div class="flbl" style="margin-bottom:6px">Additional Custom Instructions</div>
-        <textarea id="rpt-custom-instructions" class="ifield" rows="4"
-          style="font-size:12px;font-family:var(--fm);resize:vertical;line-height:1.6"
-          placeholder="e.g. I'm a long-term dividend investor. I don't trade short term. Focus on whether my thesis for each holding is intact. Flag if any of my stocks cut or suspended their dividend. Mention CAD/USD impact on my US-listed holdings."
-          oninput="saveRptSettings()"></textarea>
-      </div>
-
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <button class="btn btn-b" onclick="resetRptSettings()" style="font-size:11px;padding:7px 14px">Reset to Defaults</button>
-        <div id="rpt-settings-saved" style="font-size:11px;color:var(--green);font-family:var(--fm)"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Report selector tabs -->
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px" id="rpt-selector"></div>
-
-  <!-- Active report display -->
-  <div id="rpt-display">
-    <div style="text-align:center;padding:60px 20px;color:var(--muted)">
-      <div style="font-size:32px;margin-bottom:12px">📋</div>
-      <div style="font-size:14px">No reports yet.</div>
-      <div style="font-size:12px;margin-top:6px">Reports are generated automatically via GitHub Actions at 9:00 AM and 4:00 PM ET on weekdays and saved here.</div>
-    </div>
-  </div>
-
-</div>
-
-<!-- ══════════════ CONTRIBUTIONS ══════════════ -->
-<div id="pane-contrib" class="pane">
-  <div class="two-col" style="margin-bottom:18px">
-    <div class="card">
-      <div class="ctitle">📋 Import from Google Sheets</div>
-      <ol class="import-steps">
-        <li>Open your contributions spreadsheet</li>
-        <li>Columns must be: <code>Date | Amount</code> (Date format: YYYY-MM-DD or MM/DD/YYYY)</li>
-        <li><code>File → Share → Publish to web → CSV</code> → copy URL</li>
-        <li>Paste below and import</li>
-      </ol>
-      <div class="flbl" style="margin-bottom:6px">Published CSV URL</div>
-      <input id="contribUrl" class="ifield" placeholder="https://docs.google.com/spreadsheets/d/..." style="margin-bottom:10px"/>
-      <button class="btn btn-a" onclick="importContribSheets()" style="width:100%">Import Contributions</button>
-      <div id="contribSheetStatus" class="smsg"></div>
-    </div>
-    <div class="card">
-      <div class="ctitle">📝 Paste CSV or Add Manually</div>
-      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:14px;line-height:1.7">
-        Format: <code style="color:var(--accent2)">DATE, AMOUNT</code> one per line.<br>
-        e.g. <code style="color:var(--accent2)">2022-03-15, 2500.00</code><br>
-        Use negative for withdrawals: <code style="color:var(--red)">2023-06-01, -500.00</code>
-      </p>
-      <textarea id="contribPaste" class="ifield" rows="5" placeholder="2021-01-15,6000.00&#10;2022-01-10,6000.00&#10;2023-03-22,2500.00"></textarea>
-      <button class="btn btn-a" onclick="importContribCSV()" style="width:100%;margin-top:10px">Import CSV</button>
-      <div id="contribCsvStatus" class="smsg"></div>
-    </div>
-  </div>
-
   <div class="card" style="margin-bottom:18px">
-    <div class="ctitle">➕ Add Single Contribution</div>
-    <div class="form-row" style="grid-template-columns:1fr 1fr auto">
-      <div><div class="flbl">Date</div><input id="cin-date" class="ifield" type="date"/></div>
-      <div><div class="flbl">Amount (CAD)</div><input id="cin-amt" class="ifield" type="number" placeholder="6000.00 (use negative for withdrawals)"/></div>
-      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addContrib()">+ Add</button></div>
+    <div class="ctitle">👁 Watchlist</div>
+    <div class="form-row">
+      <div style="flex:1"><div class="flbl">Ticker</div><input id="wl-ticker" class="ifield" placeholder="e.g. SHOP" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter') addToWatchlist()"/></div>
+      <div><div class="flbl">Notes</div><input id="wl-notes" class="ifield" placeholder="optional target or reason"/></div>
+      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addToWatchlist()">+ Watch</button></div>
     </div>
   </div>
-
-  <div class="card" style="overflow-x:auto">
-    <div class="ctitle">Contribution History</div>
-    <table class="tbl">
-      <thead><tr><th>Date</th><th>Amount</th><th>Days Invested</th><th>Value Today (est.)</th><th>Return on this $</th><th></th></tr></thead>
-      <tbody id="contribBody"></tbody>
-    </table>
+  <div class="card">
+    <div id="watchlistBody" style="display:grid;gap:10px"></div>
   </div>
 </div>
 
+<!-- ══════════════ REPORTS ══════════════ -->
+<div id="pane-reports" class="pane">
+  <div class="card" style="margin-bottom:18px">
+    <div class="ctitle">📋 Daily Reports</div>
+    <div id="rpt-next-info" style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:16px"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn btn-a" onclick="renderReports()">🔄 Refresh</button>
+    </div>
+    <div style="margin-bottom:22px">
+      <div style="font-size:13px;font-weight:700;font-family:var(--fh);margin-bottom:8px">🌅 Pre-Market</div>
+      <div style="font-size:10px;color:var(--muted);font-family:var(--fm);margin-bottom:8px" id="rpt-premarket-time"></div>
+      <div id="rpt-premarket-body" style="font-size:13px;line-height:1.8;color:var(--text)"></div>
+    </div>
+    <div>
+      <div style="font-size:13px;font-weight:700;font-family:var(--fh);margin-bottom:8px">🔔 Close</div>
+      <div style="font-size:10px;color:var(--muted);font-family:var(--fm);margin-bottom:8px" id="rpt-close-time"></div>
+      <div id="rpt-close-body" style="font-size:13px;line-height:1.8;color:var(--text)"></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">📚 Report History</div>
+    <div id="rpt-history" style="margin-top:10px"></div>
+  </div>
+</div>
 
-<!-- ══════════════ DEBUG PANEL ══════════════ -->
+<!-- ══════════════ DEBUG ══════════════ -->
 <div id="pane-debug" class="pane" style="padding:16px">
   <div class="card">
     <div class="ctitle">🔧 Price Fetch Debug</div>
-    <div style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:12px">
-      Tests each price source live and shows exactly what's working or broken.
-    </div>
+    <div style="font-size:12px;color:var(--muted);font-family:var(--fm);margin-bottom:12px">Tests each price source live and shows exactly what's working or broken.</div>
     <button onclick="runDebug()" style="background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 20px;font-weight:700;font-family:var(--fm);cursor:pointer;margin-bottom:16px">▶ Run Diagnosis</button>
     <div id="debugOut" style="font-family:monospace;font-size:12px;line-height:1.8;white-space:pre-wrap;color:var(--fg)"></div>
-  </div>
-</div>
-</main>
-
-<!-- Firebase Modal -->
-<div id="fbModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:540px;width:90%;position:relative">
-    <div style="font-size:16px;font-weight:700;color:var(--accent2);margin-bottom:8px">☁️ Firebase Sync Setup</div>
-    <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.8;margin-bottom:16px">
-      Syncs your data across all devices in real time — free forever for personal use.<br>
-      <strong style="color:var(--accent)">Setup (5 min):</strong><br>
-      1. Go to <strong>console.firebase.google.com</strong> → Create project (disable Analytics)<br>
-      2. Click <strong>Firestore Database</strong> → Create database → Start in <strong>test mode</strong><br>
-      3. Go to <strong>Project Settings ⚙️</strong> → scroll to "Your apps" → click <strong>&lt;/&gt;</strong> (Web)<br>
-      4. Register app → copy the <strong>firebaseConfig</strong> object → paste below<br>
-      5. Also go to <strong>Firestore → Rules</strong> and make sure rules allow read/write
-    </p>
-    <div class="flbl" style="margin-bottom:6px">Firebase Config (paste the entire config object)</div>
-    <textarea id="fbConfigInput" class="ifield" rows="7" style="font-family:var(--fm);font-size:11px" placeholder='{&#10;  "apiKey": "AIza...",&#10;  "authDomain": "your-app.firebaseapp.com",&#10;  "projectId": "your-project-id",&#10;  "storageBucket": "your-app.appspot.com",&#10;  "messagingSenderId": "123456789",&#10;  "appId": "1:123:web:abc"&#10;}'></textarea>
-    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-      <button class="btn btn-a" onclick="saveFBConfig()" style="flex:1">Connect Firebase</button>
-      <button class="btn btn-b" onclick="fbLoad().then(function(ok){ if(ok){ closeFBModal(); setTimeout(function(){ renderAll(); fetchPrices(); if(contributions.length) renderContribs(); if(transactions.length) renderTxns(); }, 300); } })" style="flex:1">Pull from Cloud</button>
-      <button class="btn btn-b" onclick="fbSave().then(function(){ showToast('☁️ Pushed to cloud!'); })" style="flex:1">Push to Cloud</button>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:10px">
-      <button class="btn" style="flex:1;background:rgba(255,94,94,.1);border-color:rgba(255,94,94,.3);color:var(--red)" onclick="disconnectFB()">Disconnect</button>
-      <button class="btn btn-b" onclick="closeFBModal()" style="flex:1">Close</button>
-    </div>
-    <div id="fbStatus" style="margin-top:12px;font-size:12px;font-family:var(--fm)"></div>
-  </div>
-</div>
-
-<!-- API Key Modal -->
-<div id="keyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;max-width:480px;width:90%;position:relative">
-    <div style="font-size:16px;font-weight:700;color:var(--accent);margin-bottom:8px">⚙️ Anthropic API Key</div>
-    <p style="font-size:13px;color:var(--muted);font-family:var(--fm);line-height:1.7;margin-bottom:20px">
-      Required for the AI Advisor. Get a free key at <strong style="color:var(--accent2)">console.anthropic.com</strong><br>
-      Your key is saved locally in your browser only — never sent anywhere except Anthropic.
-    </p>
-    <div class="flbl" style="margin-bottom:6px">Anthropic API Key (starts with sk-ant-...)</div>
-    <input id="keyInput" class="ifield" type="password" placeholder="sk-ant-api03-..." style="margin-bottom:20px;font-family:var(--fm)"/>
-
-    <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:16px">
-      <div style="font-size:14px;font-weight:700;color:#4af0c8;margin-bottom:6px">⚡ Cloudflare Worker URL <span style="font-size:11px;font-weight:400;color:var(--muted)">(optional — fixes proxy issues)</span></div>
-      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.6;margin-bottom:10px">
-        Deploy the included <code style="background:rgba(255,255,255,.08);padding:1px 5px;border-radius:3px">vestiq-proxy-worker.js</code> to Cloudflare Workers (free tier) for reliable price data. Paste your worker URL below.
-      </p>
-      <div class="flbl" style="margin-bottom:6px">Worker URL</div>
-      <input id="workerUrlInput" class="ifield" placeholder="https://vestiq-proxy.yourname.workers.dev" style="font-family:var(--fm);margin-bottom:4px"/>
-      <div id="worker-status" style="font-size:11px;color:var(--muted);font-family:var(--fm);margin-bottom:4px"></div>
-    </div>
-
-    <div style="border-top:1px solid var(--border);padding-top:20px;margin-bottom:16px">
-      <div style="font-size:14px;font-weight:700;color:var(--accent2);margin-bottom:6px">📊 Financial Modeling Prep (FMP)</div>
-      <p style="font-size:12px;color:var(--muted);font-family:var(--fm);line-height:1.6;margin-bottom:12px">
-        Required for the Stock Screener. Get a free key (250 calls/day) at
-        <strong style="color:var(--accent2)">financialmodelingprep.com</strong><br>
-        Free tier covers all screener usage. Key stored locally only.
-      </p>
-      <div class="flbl" style="margin-bottom:6px">FMP API Key</div>
-      <input id="fmpKeyInput" class="ifield" type="password" placeholder="your_fmp_api_key_here" style="font-family:var(--fm)"/>
-    </div>
-
-    <div style="display:flex;gap:10px">
-      <button class="btn btn-a" onclick="saveKey()" style="flex:1">Save Keys</button>
-      <button class="btn btn-b" onclick="closeKeyModal()" style="flex:1">Cancel</button>
-    </div>
-    <div id="keyStatus" style="margin-top:12px;font-size:12px;font-family:var(--fm)"></div>
   </div>
 </div>
 
@@ -1305,6 +827,7 @@ canvas + *{color:#e8eaf0 !important}
 // ── STATE ─────────────────────────────────────────────────────────────────
 var holdings   = [];
 var prices     = {};
+var divYields  = {}; // { ticker: annualYieldPct }
 // ── CHART GLOBAL DEFAULTS (Chart.js v4 correct API) ─────────────────────
 Chart.defaults.color = '#a0a8c0';
 Chart.defaults.borderColor = 'rgba(255,255,255,.07)';
@@ -1321,7 +844,6 @@ Chart.defaults.font.family = 'JetBrains Mono';
 Chart.defaults.plugins.legend.labels.color = '#e8eaf0';
 
 var myCharts   = {};
-var aiHistory  = [];
 var COLORS     = ['#c8f04a','#4af0c8','#ff6b9d','#a78bfa','#ffa94d','#51cf66','#60cdff','#f783ac','#ff922b','#38d9a9'];
 
 // ── PERSISTENCE ───────────────────────────────────────────────────────────
@@ -1351,10 +873,6 @@ function showTab(name) {
   closeMoreDrawer();
   window.scrollTo(0, 0);
   if (name === 'charts') setTimeout(function(){ drawCharts(enrich()); renderAllocation(enrich()); }, 80);
-  if (name === 'ai') {
-    var w = document.getElementById('noKeyWarning');
-    if (w) w.style.display = anthropicKey ? 'none' : 'block';
-  }
   if (name === 'contrib') { renderContribs(); setTimeout(function(){ if(contributions.length) drawContribChart(enrich().reduce(function(s,h){return s+h.mktValue;},0), contributions.reduce(function(s,c){return s+c.amount;},0)); }, 100); }
   if (name === 'txn') { renderTxns(); updateTxnForm(); }
   if (name === 'div') { renderDividends(); setTimeout(function(){ if(transactions.length) drawDividendChart(Object.values((function(){var b={};transactions.filter(function(t){return t.type==='DIV'||t.type==='FPLINT';}).forEach(function(t){var k=t.ticker||'OTHER';if(!b[k])b[k]={total:0,ticker:k};b[k].total+=t.amount;});return b;})()).sort(function(a,b){return b.total-a.total;})); }, 100); }
@@ -1373,14 +891,11 @@ var cadPerUsd = 1.36; // updated live on each price fetch
 var sortKey = 'mktValue';
 var sortDir = -1; // -1 = descending, 1 = ascending
 var hideAmounts = false;
-var anthropicKey = localStorage.getItem('vq_apikey') || '';
 var fmpKey       = localStorage.getItem('vq_fmpkey') || '';
+var anthropicKey = localStorage.getItem('vq_apikey')    || '';
+var geminiKey    = localStorage.getItem('vq_geminikey') || '';
+var groqKey      = localStorage.getItem('vq_groqkey')   || '';
 
-function anthropicUrl() {
-  var worker = localStorage.getItem('vq_worker_url') || '';
-  if (worker) return worker.replace(/\/$/, '') + '/anthropic/v1/messages';
-  return 'https://api.anthropic.com/v1/messages';
-}
 var firebaseConfig = null;
 var firebaseDB     = null;
 var firebaseUID    = 'main'; // fixed doc ID - same on all devices
@@ -1582,6 +1097,7 @@ async function fetchPrices() {
         var chg2   = Math.round((price2 - prev2) * 10000) / 10000;
         var chgP2  = prev2 ? Math.round((chg2 / prev2) * 100 * 100) / 100 : 0;
         prices[t] = { price: price2, change: chg2, changePct: chgP2, name: fmpResult.name, currency: isTSX ? 'CAD' : 'USD→CAD', stale: false, source: 'FMP' };
+        if (fmpResult.yield != null) divYields[t] = fmpResult.yield;
         gotPrice = true;
       }
     }
@@ -1601,6 +1117,8 @@ async function fetchPrices() {
           var change    = Math.round((price - prev) * 10000) / 10000;
           var changePct = prev ? Math.round((change / prev) * 100 * 100) / 100 : 0;
           prices[t] = { price: price, change: change, changePct: changePct, name: meta.longName || meta.shortName || t, currency: isTSX ? 'CAD' : 'USD→CAD', stale: false, source: 'Yahoo' };
+          var yld = meta.trailingAnnualDividendYield || meta.dividendYield || 0;
+          if (yld) divYields[t] = +(yld * 100).toFixed(2);
           gotPrice = true;
         } else {
           throw new Error('no price in Yahoo response');
@@ -1773,13 +1291,16 @@ function showToast(msg, isError) {
 function showKeyModal() {
   var modal = document.getElementById('keyModal');
   modal.style.display = 'flex';
-  document.getElementById('keyInput').value = anthropicKey;
+  // AI keys removed
   document.getElementById('fmpKeyInput').value = fmpKey;
   var wu = document.getElementById('workerUrlInput');
   if (wu) wu.value = localStorage.getItem('vq_worker_url') || '';
   var ws = document.getElementById('worker-status');
   if (ws) ws.textContent = localStorage.getItem('vq_worker_url') ? '✅ Worker configured' : 'Not configured — using public proxies';
-  document.getElementById('keyStatus').textContent = anthropicKey ? '✅ Anthropic key saved' + (fmpKey ? ' · FMP key saved' : '') : '';
+  var kParts = [];
+
+  if (fmpKey) kParts.push('✅ FMP key saved');
+  document.getElementById('keyStatus').textContent = kParts.join(' · ');
   document.getElementById('keyStatus').style.color = 'var(--green)';
 }
 
@@ -1799,6 +1320,7 @@ function saveKey() {
     }
     anthropicKey = key;
     localStorage.setItem('vq_apikey', key);
+
     msgs.push('Anthropic key saved');
   }
   if (fmpRaw) {
@@ -1909,10 +1431,15 @@ function renderAll() {
           '<td>' + (hideAmounts ? '••••••' : '$' + h.mktValue.toFixed(2)) + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.gainPct) : cd(h.gain) + ' <span style="font-size:10px;color:var(--muted)">' + cpd(h.gainPct) + '</span>') + '</td>' +
           '<td>' + (hideAmounts ? cpd(h.changePct||0) : cd(h.dayChange) + ' <span style="font-size:10px;color:var(--muted)">' + cpd(h.changePct||0) + '</span>') + '</td>' +
+          '<td style="font-size:12px;font-family:var(--fm);white-space:nowrap">' + (function(){
+            var y = divYields[h.ticker];
+            if (!y) return '<span style="color:var(--muted)">—</span>';
+            return '<span style="color:var(--accent2);font-weight:600">' + y.toFixed(2) + '%</span>';
+          })() + '</td>' +
           '<td style="font-size:11px;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (h.notes||'') + '</td>' +
           '</tr>';
       }).join('')
-    : '<tr><td colspan="8" class="empty">No holdings yet — add some in Holdings or Import</td></tr>';
+    : '<tr><td colspan="9" class="empty">No holdings yet — add some in Holdings or Import</td></tr>';
 
   // Holdings edit table
   document.getElementById('holdBody').innerHTML = data.length
@@ -2043,7 +1570,8 @@ async function fetchPriceFromFMP(ticker) {
       var q = Array.isArray(data) ? data[0] : data;
       if (!q || !q.price) continue;
       console.log('[Vestiq] FMP succeeded for ' + ticker);
-      return { price: q.price, prev: q.previousClose || q.price, name: q.name || ticker };
+      var yldVal = q.lastAnnualDividend && q.price ? +(q.lastAnnualDividend / q.price * 100).toFixed(2) : null;
+      return { price: q.price, prev: q.previousClose || q.price, name: q.name || ticker, yield: yldVal };
     } catch(e) { continue; }
   }
   return null;
@@ -2250,80 +1778,10 @@ function drawCharts(data) {
 }
 
 // ── AI ADVISOR ────────────────────────────────────────────────────────────
-function useChip(el) {
-  document.getElementById('aiInput').value = el.textContent;
-  sendAI();
-}
 
-async function sendAI() {
-  var input = document.getElementById('aiInput');
-  var q = input.value.trim();
-  if (!q) return;
 
-  var data = enrich();
-  var tv = data.reduce(function(s,h){ return s+h.mktValue; }, 0);
-  var tg = data.reduce(function(s,h){ return s+h.gain; }, 0);
-  var tc = data.reduce(function(s,h){ return s+h.costBasis; }, 0);
 
-  var ctx = data.map(function(h) {
-    return '• ' + h.ticker + ' (' + (h.name||h.ticker) + '): ' + h.shares + ' shares @ avg $' + h.avgCost +
-      ' | Current $' + (h.price ? h.price.toFixed(2) : 'N/A') +
-      ' | Avg Cost $' + avgCostCAD.toFixed(2) + ' CAD' +
-      ' | Value $' + h.mktValue.toFixed(2) +
-      ' | Gain ' + h.gainPct.toFixed(1) + '%' +
-      ' | Today ' + (h.changePct ? h.changePct.toFixed(2) : '0') + '%';
-  }).join('\n');
 
-  var sys = 'You are a sharp, concise financial advisor AI. Use web search to find current news relevant to the user\'s specific holdings before answering.\n\nUSER PORTFOLIO:\n' + ctx +
-    '\n\nTotal Value: $' + tv.toFixed(2) + ' | Total Gain: ' + (tg>=0?'+':'') + '$' + tg.toFixed(2) + ' (' + (tc ? ((tg/tc)*100).toFixed(1) : 0) + '%)' +
-    '\n\nRules: Search for recent news on their tickers first. Be direct, reference actual tickers and dollar amounts. Use bullet points. Under 280 words. Flag risks clearly.';
-
-  var box = document.getElementById('chatBox');
-  box.innerHTML += '<div class="msg msg-u">' + q + '</div>';
-  var lid = 'ai-load-' + Date.now();
-  box.innerHTML += '<div class="msg msg-a" id="' + lid + '"><span class="dots"><span></span><span></span><span></span></span> Searching news & analysing your portfolio...</div>';
-  box.scrollTop = box.scrollHeight;
-
-  var btn = document.getElementById('aiBtn');
-  btn.disabled = true; btn.textContent = '...';
-  input.value = '';
-  aiHistory.push({ role: 'user', content: q });
-
-  try {
-    if (!anthropicKey) {
-      document.getElementById(lid).remove();
-      box.innerHTML += '<div class="msg msg-a" style="color:var(--red)">⚠️ No API key set. Click the ⚙️ button in the header to add your Anthropic API key.</div>';
-      btn.disabled = false; btn.textContent = 'Ask →';
-      box.scrollTop = box.scrollHeight;
-      return;
-    }
-    var resp = await fetch(anthropicUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: sys,
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-        messages: aiHistory
-      })
-    });
-    var result = await resp.json();
-    var blocks = result.content || [];
-    var reply  = blocks.filter(function(b){ return b.type === 'text'; }).map(function(b){ return b.text; }).join('\n') || 'No response received.';
-    aiHistory.push({ role: 'assistant', content: reply });
-    var el = document.getElementById(lid);
-    if (el) el.remove();
-    box.innerHTML += '<div class="msg msg-a">' + reply + '</div>';
-  } catch(e) {
-    var el = document.getElementById(lid);
-    if (el) el.remove();
-    box.innerHTML += '<div class="msg msg-a" style="color:var(--red)">⚠️ Could not reach the AI. Check your internet connection.</div>';
-  }
-
-  btn.disabled = false; btn.textContent = 'Ask →';
-  box.scrollTop = box.scrollHeight;
-}
 
 // ── TRANSACTIONS ─────────────────────────────────────────────────────────
 var TYPE_COLORS = { BUY:'var(--accent)', SELL:'var(--red)', DIV:'var(--accent2)', CONT:'var(--accent2)', WD:'var(--red)', NRT:'var(--red)', FPLINT:'var(--accent2)' };
@@ -3807,7 +3265,7 @@ function renderMarkdown(md, targetId) {
 
 // Check auto-generate every minute while app is open — only if key is set
 setInterval(function() {
-  if (!anthropicKey) return; // no key, nothing to do
+  return; // AI advisor removed
   var pane = document.getElementById('pane-reports');
   var isActive = pane && pane.classList.contains('active');
   if (isActive) updateNextReportInfo();
