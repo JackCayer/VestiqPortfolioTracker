@@ -455,7 +455,7 @@ canvas + *{color:#e8eaf0 !important}
       <div class="stat"><div class="slbl">Avg Hold Time</div><div class="sval" id="sv-hold">—</div><div class="ssub">since first contribution</div></div>
     </div>
     <div class="section-hdr" style="margin-bottom:14px">Portfolio Value vs Contributions Over Time</div>
-    <div class="card" style="margin-bottom:22px"><canvas id="cContrib" style="max-height:220px !important"></canvas></div>
+    <div class="card" style="margin-bottom:22px"><canvas id="cContribDash" style="max-height:220px !important"></canvas></div>
   </div>
   <div class="stat-grid" style="margin-bottom:22px">
     <div class="stat"><div class="slbl">Realized Gains</div><div class="sval" id="sv-realized">—</div><div class="ssub">from closed trades</div></div>
@@ -677,12 +677,17 @@ canvas + *{color:#e8eaf0 !important}
 
 <!-- ══════════════ REALIZED GAINS ══════════════ -->
 <div id="pane-realized" class="pane">
-  <div class="card" style="margin-bottom:18px">
+  <div class="stat-grid" style="margin-bottom:22px">
+    <div class="stat"><div class="slbl">Total Realized</div><div class="sval" id="rz-total">—</div><div class="ssub" id="rz-sub">closed positions</div></div>
+    <div class="stat"><div class="slbl">Best Trade</div><div class="sval" id="rz-best">—</div><div class="ssub" id="rz-best-sub"></div></div>
+    <div class="stat"><div class="slbl">Worst Trade</div><div class="sval" id="rz-worst">—</div><div class="ssub" id="rz-worst-sub"></div></div>
+    <div class="stat"><div class="slbl">Win Rate</div><div class="sval" id="rz-winrate">—</div><div class="ssub" id="rz-winrate-sub"></div></div>
+  </div>
+  <div class="card">
     <div class="ctitle">💹 Realized Gains / Losses</div>
-    <div id="realizedSummary" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;font-family:var(--fm);font-size:13px"></div>
     <div style="overflow-x:auto">
       <table class="tbl"><thead><tr><th>Ticker</th><th>Shares Sold</th><th>Avg Cost</th><th>Sell Price</th><th>Gain $</th><th>Gain %</th><th>Date</th></tr></thead>
-      <tbody id="realizedBody"></tbody></table>
+      <tbody id="rzBody"></tbody></table>
     </div>
   </div>
 </div>
@@ -781,13 +786,14 @@ canvas + *{color:#e8eaf0 !important}
   <div class="card" style="margin-bottom:18px">
     <div class="ctitle">👁 Watchlist</div>
     <div class="form-row">
-      <div style="flex:1"><div class="flbl">Ticker</div><input id="wl-ticker" class="ifield" placeholder="e.g. SHOP" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter') addToWatchlist()"/></div>
+      <div style="flex:1"><div class="flbl">Ticker</div><input id="wl-ticker" class="ifield" placeholder="e.g. SHOP" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter') addToWatchlistDirect()"/></div>
       <div><div class="flbl">Notes</div><input id="wl-notes" class="ifield" placeholder="optional target or reason"/></div>
-      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addToWatchlist()">+ Watch</button></div>
+      <div><div class="flbl">&nbsp;</div><button class="btn btn-a" onclick="addToWatchlistDirect()">+ Watch</button></div>
     </div>
   </div>
   <div class="card">
-    <div id="watchlistBody" style="display:grid;gap:10px"></div>
+    <div id="wl-empty" style="color:var(--muted);font-size:13px;font-family:var(--fm);text-align:center;padding:24px">No tickers on your watchlist yet. Add one above.</div>
+    <div id="wl-grid" style="display:grid;gap:14px"></div>
   </div>
 </div>
 
