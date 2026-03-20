@@ -2014,15 +2014,21 @@ function renderLotBreakdown() {
 function renderTxnTable() {
   populateTxTickerSelect();
   var filtered = transactions.slice();
-  if (txFilter !== 'all') filtered = filtered.filter(function(t){ return t.type === txFilter; });
-  if (txTickerFilter !== 'all') filtered = filtered.filter(function(t){ return t.ticker === txTickerFilter; });
-  filtered.sort(function(a, b) {
-    var av = a[txSort.col] || '', bv = b[txSort.col] || '';
-    if (typeof av === 'number' || !isNaN(parseFloat(av))) {
-      return (parseFloat(av)||0 - parseFloat(bv)||0) * txSort.dir;
-    }
-    return av.toString().localeCompare(bv.toString()) * txSort.dir;
-  });
+
+  // Read filters directly from DOM so they always reflect current dropdown state
+  var typeEl   = document.getElementById('txn-filter-type');
+  var sortEl   = document.getElementById('txn-sort');
+  var activeType = typeEl ? typeEl.value : '';
+  var activeSort = sortEl ? sortEl.value : 'date-desc';
+
+  if (activeType) filtered = filtered.filter(function(t){ return t.type === activeType; });
+
+  // Sort
+  if (activeSort === 'date-desc')   filtered.sort(function(a,b){ return b.date.localeCompare(a.date); });
+  else if (activeSort === 'date-asc')    filtered.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  else if (activeSort === 'amount-desc') filtered.sort(function(a,b){ return (b.amount||0)-(a.amount||0); });
+  else if (activeSort === 'ticker-asc')  filtered.sort(function(a,b){ return (a.ticker||'').localeCompare(b.ticker||''); });
+
   var TYPE_BADGE = { BUY:'#c8f04a', SELL:'#ff5e5e', DIV:'#4af0c8', CONT:'#4af0c8', WD:'#ff5e5e', NRT:'#ff5e5e', FPLINT:'#4af0c8' };
   document.getElementById('txnBody').innerHTML = filtered.length
     ? filtered.map(function(t) {
@@ -2055,14 +2061,16 @@ function deleteTxn(id) {
 }
 
 function renderTxnSummary() {
-  if (!transactions.length) { document.getElementById('txnSummary').textContent = 'No transactions imported yet.'; return; }
+  var el = document.getElementById('txnSummary');
+  if (!el) return; // element optional — don't crash
+  if (!transactions.length) { el.textContent = 'No transactions yet.'; return; }
   var buys  = transactions.filter(function(t){ return t.type==='BUY'; });
   var sells = transactions.filter(function(t){ return t.type==='SELL'; });
   var divs  = transactions.filter(function(t){ return t.type==='DIV'||t.type==='FPLINT'; });
-  var totalBuy  = buys.reduce(function(s,t){ return s+t.amount; },0);
-  var totalSell = sells.reduce(function(s,t){ return s+t.amount; },0);
-  var totalDiv  = divs.reduce(function(s,t){ return s+t.amount; },0);
-  document.getElementById('txnSummary').innerHTML =
+  var totalBuy  = buys.reduce(function(s,t){ return s+(t.amount||0); },0);
+  var totalSell = sells.reduce(function(s,t){ return s+(t.amount||0); },0);
+  var totalDiv  = divs.reduce(function(s,t){ return s+(t.amount||0); },0);
+  el.innerHTML =
     '<div>📅 <strong>' + transactions[0].date + '</strong> → <strong>' + transactions[transactions.length-1].date + '</strong></div>' +
     '<div>🛒 <strong>' + buys.length + '</strong> buys totalling ' + (hideAmounts ? '••••••' : '$' + totalBuy.toFixed(2)) + '</div>' +
     '<div>💸 <strong>' + sells.length + '</strong> sells totalling ' + (hideAmounts ? '••••••' : '$' + totalSell.toFixed(2)) + '</div>' +
